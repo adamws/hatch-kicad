@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -38,7 +38,10 @@ Source = "https://github.com/unknown/hatch-kicad"
 kicad = "hatch_kicad.hooks"
 
 [tool.hatch.version]
-path = "src/hatch_kicad/__about__.py"
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/hatch_kicad/_version.py"
 
 [tool.hatch.envs.default]
 dependencies = [
