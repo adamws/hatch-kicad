@@ -43,6 +43,11 @@ source = "vcs"
 [tool.hatch.build.hooks.vcs]
 version-file = "src/hatch_kicad/_version.py"
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.github",
+]
+
 [tool.hatch.envs.default]
 dependencies = [
   "coverage[toml]>=6.5",
