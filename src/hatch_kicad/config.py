@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any
 
 from hatchling.builders.config import BuilderConfig
 
@@ -27,12 +27,6 @@ class KicadBuilderConfig(BuilderConfig):
         if isinstance(value, list):
             value = "".join(value)
         return value
-
-    def optional_str(self, name: str) -> Optional[str]:
-        try:
-            return self.required_str(name)
-        except Exception:
-            return None
 
     @property
     def name(self) -> str:
@@ -73,7 +67,7 @@ class KicadBuilderConfig(BuilderConfig):
     def type(self) -> str:
         return "plugin"
 
-    def get_person(self, name: str) -> Optional[dict]:
+    def get_person(self, name: str) -> dict | None:
         if name in self.target_config:
             person = self.target_config[name]
             if not isinstance(person, dict):
@@ -89,26 +83,65 @@ class KicadBuilderConfig(BuilderConfig):
         return None
 
     @property
-    def author(self) -> Optional[dict]:
+    def author(self) -> dict:
         """
         Object containing one mandatory field, `name`, containing the name
         of the package creator.
         An optional `contact` field may be present,
         containing free-form fields with contact information.
         """
-        return self.get_person("author")
+        author = self.get_person("author")
+        if not author:
+            authors = self.builder.metadata.core.authors
+            if authors and "name" in authors[0]:
+                author = {
+                    "name": authors[0]["name"],
+                }
+                if "email" in authors[0]:
+                    author["contact"] = {"email": authors[0]["email"]}
+                else:
+                    author["contact"] = {}
+            else:
+                msg = (
+                    f"Field `{self._BASE}.author` not found, "
+                    "failed to get author from `project.authors` value"
+                )
+                raise TypeError(msg)
+        return author
 
     @property
-    def maintainer(self) -> Optional[dict]:
+    def maintainer(self) -> dict:
         """
         Semantics same as `author`, but containing information
         about the maintainer of the package
         """
-        return self.get_person("maintainer")
+        maintainer = self.get_person("maintainer")
+        if not maintainer:
+            maintainers = self.builder.metadata.core.maintainers
+            if maintainers and "name" in maintainers[0]:
+                maintainer = {
+                    "name": maintainers[0]["name"],
+                    "contact": {"email": maintainers[0].get("email", "-")},
+                }
+            else:
+                maintainer = {}
+        return maintainer
 
     @property
     def license(self):
-        return self.optional_str("license")
+        # if `self.config` does not contain `license`,
+        # try to deduce it from project settings
+        if "license" in self.target_config:
+            lic = self.required_str("license")
+        elif not (lic := self.builder.metadata.core.license):
+            msg = (
+                "Field `tool.hatch.build.targets.kicad-package.license` not found, "
+                "failed to deduce license from `project.license` value.\n"
+                'Define `license = {text = "<value>"} in `project` or '
+                '`license = "<value>" in `tool.hatch.build.targets.kicad-package'
+            )
+            raise TypeError(msg)
+        return lic
 
     @property
     def resources(self):
@@ -117,8 +150,10 @@ class KicadBuilderConfig(BuilderConfig):
             if not isinstance(resources, dict):
                 msg = f"Field `{self._BASE}.resources` must be a dictionary"
                 raise TypeError(msg)
-            return resources
-        return None
+        else:
+            # `resources` are not mandatory so if can't be found nothing happens
+            resources = self.builder.metadata.core.urls
+        return resources
 
     @property
     def keep_on_update(self):
@@ -152,10 +187,14 @@ class KicadBuilderConfig(BuilderConfig):
         """
         The latest KiCad version this package is compatible with
         """
-        return self.optional_str("kicad_version_max")
+        if "kicad_version_max" in self.target_config:
+            kicad_version_max = self.required_str("kicad_version_max")
+        else:
+            kicad_version_max = None
+        return kicad_version_max
 
     @property
-    def tags(self) -> Optional[list[str]]:
+    def tags(self) -> list[str] | None:
         """
         The list of tags
         """
@@ -170,3 +209,34 @@ class KicadBuilderConfig(BuilderConfig):
                 raise TypeError(msg)
             return tags
         return None
+
+    def get_metadata(self) -> dict[str, Any]:
+        metadata = {
+            "$schema": "https://go.kicad.org/pcm/schemas/v1",
+            "name": self.name,
+            "description": self.description,
+            "description_full": self.description_full,
+            "identifier": self.identifier,
+            "type": self.type,
+            "author": self.author,
+            "maintainer": self.maintainer,
+            "license": self.license,
+            "resources": self.resources,
+            "tags": self.tags,
+            "versions": [
+                {
+                    "version": self.builder.metadata.version,
+                    "status": self.status,
+                    "kicad_version": self.kicad_version,
+                    "kicad_version_max": self.kicad_version_max,
+                }
+            ],
+        }
+        # remove empty optional fields
+        for name in ["maintainer", "resources", "tags"]:
+            if not metadata[name]:
+                del metadata[name]
+        if not metadata["versions"][0]["kicad_version_max"]:
+            del metadata["versions"][0]["kicad_version_max"]
+
+        return metadata
