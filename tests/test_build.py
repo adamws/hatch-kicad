@@ -1,7 +1,15 @@
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+import zipfile
+from pathlib import Path
+
 import pytest
 from hatchling.builders.plugin.interface import BuilderInterface
 
-from hatch_kicad.build import KicadBuilder
+from hatch_kicad.build import KicadBuilder, get_package_metadata
 
 
 def merge_dicts(x, y):
@@ -213,7 +221,7 @@ def test_maintainer_fallback_missing(isolation):
     # return empty dictionary (maintainer is not required)
     config = {"project": {"name": "Plugin", "version": "0.1.0"}}
     builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.maintainer == {}
+    assert builder.config.maintainer is None
 
 
 def test_maintainer_wrong_type(isolation):
@@ -343,7 +351,7 @@ def test_kicad_version_max_wrong_type(isolation):
 
 def test_kicad_version_max_missing(isolation):
     builder = KicadBuilder(str(isolation), config={})
-    assert builder.config.kicad_version_max is None
+    assert builder.config.kicad_version_max == ""
 
 
 def test_tags(isolation):
@@ -354,7 +362,7 @@ def test_tags(isolation):
 
 def test_tags_missing(isolation):
     builder = KicadBuilder(str(isolation), config={})
-    assert builder.config.tags is None
+    assert builder.config.tags == []
 
 
 def test_tags_wrong_type(isolation):
@@ -366,6 +374,34 @@ def test_tags_wrong_type(isolation):
         "must be list of strings",
     ):
         _ = builder.config.tags
+
+
+def test_icon(isolation):
+    tf = tempfile.NamedTemporaryFile()
+    config = build_config({"icon": tf.name})
+    builder = KicadBuilder(str(isolation), config=config)
+    assert builder.config.icon == Path(tf.name)
+
+
+def test_icon_does_not_exist(isolation):
+    config = build_config({"icon": "src/icon.png"})
+    builder = KicadBuilder(str(isolation), config=config)
+    with pytest.raises(
+        TypeError,
+        match="Field `tool.hatch.build.targets.kicad-package.icon` "
+        "must point to a file",
+    ):
+        _ = builder.config.icon
+
+
+def test_icon_wrong_type(isolation):
+    config = build_config({"icon": ["src/icon.png"]})
+    builder = KicadBuilder(str(isolation), config=config)
+    with pytest.raises(
+        TypeError,
+        match="Field `tool.hatch.build.targets.kicad-package.icon` must be a string",
+    ):
+        _ = builder.config.icon
 
 
 def test_get_metadata(isolation):
@@ -394,3 +430,66 @@ def test_get_metadata(isolation):
         "license": "MIT",
         "versions": [{"kicad_version": "6.0", "status": "stable", "version": "0.0.1"}],
     }
+
+
+def test_package_metadata_calculation(request):
+    test_dir = Path(request.module.__file__).parent
+    metadata = get_package_metadata(f"{test_dir}/example.zip")
+    assert (
+        metadata["download_sha256"]
+        == "b97d51ed4b8f3efcf53fffbfdc6a353fe516da1efbf807b2750ef3873e8e63ef"
+    )
+    assert metadata["download_size"] == 174
+    assert metadata["install_size"] == 10
+
+
+def get_zip_contents(zip_path) -> list[str]:
+    content = []
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        for file_name in zip_ref.namelist():
+            content.append(file_name)
+    return content
+
+
+def test_build_standard(isolation):
+    dist_dir = f"{isolation}/dist"
+    src_dir = f"{isolation}/src"
+    os.mkdir(dist_dir)
+    os.mkdir(src_dir)
+    icon = tempfile.NamedTemporaryFile(dir=src_dir)
+    sources = [tempfile.NamedTemporaryFile(dir=src_dir, suffix=".py") for _ in range(5)]
+    data = {
+        "name": "Plugin Name",
+        "description": "Short Decription",
+        "description_full": ["Full multiline\n", "description"],
+        "identifier": "com.plugin.identifier",
+        "author": {"name": "bar", "email": "bar@domain"},
+        "license": "MIT",
+        "status": "stable",
+        "kicad_version": "6.0",
+        "icon": icon.name,
+        "sources": ["src"],
+        "include": ["src/*.py"],
+    }
+    config = merge_dicts(
+        {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
+    )
+    builder = KicadBuilder(str(isolation), config=config)
+    builder.build_standard(dist_dir)
+    with open(f"{dist_dir}/metadata.json") as f:
+        metadata_result = json.load(f)
+        version = metadata_result["versions"][0]
+        assert "download_sha256" in version
+        assert "download_size" in version
+        assert "install_size" in version
+        del version["download_sha256"]
+        del version["download_size"]
+        del version["install_size"]
+        assert metadata_result == builder.config.get_metadata()
+
+    in_zip = get_zip_contents(f"{isolation}/dist/Plugin-0.0.1.zip")
+    expected = ["resources/icon.png", "metadata.json"]
+    for s in sources:
+        name = Path(s.name).name
+        expected.append(f"plugin/{name}")
+    assert len(in_zip) == len(expected) and sorted(in_zip) == sorted(expected)

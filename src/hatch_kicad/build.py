@@ -71,8 +71,7 @@ class KicadBuilder(BuilderInterface):
         with zipfile.ZipFile(zip_target, "w", zipfile.ZIP_DEFLATED) as zipf:
             for file in self.recurse_included_files():
                 zipf.write(file.path, f"plugin/{file.distribution_path}")
-            if "icon" in self.target_config:
-                zipf.write(self.target_config["icon"], "resources/icon.png")
+            zipf.write(self.config.icon, "resources/icon.png")
             zipf.write(metadata_target, "metadata.json")
 
         if metadata:
