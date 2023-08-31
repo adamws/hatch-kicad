@@ -73,6 +73,14 @@ class TestRequiredStringOptions:
         ):
             _ = getattr(builder.config, name)
 
+    def test_option_missing(self, name, isolation):
+        builder = KicadBuilder(str(isolation), config={})
+        with pytest.raises(
+            TypeError,
+            match=f"Field `tool.hatch.build.targets.kicad-package.{name}` not found"
+        ):
+            _ = getattr(builder.config, name)
+
 
 def test_type(isolation):
     # type is always equal 'plugin'
@@ -332,6 +340,11 @@ def test_resources_fallback_missing(isolation):
     assert builder.config.resources == {}
 
 
+def test_keep_on_update(isolation):
+    builder = KicadBuilder(str(isolation), config={})
+    assert builder.config.keep_on_update is None
+
+
 def test_kicad_version_max(isolation):
     config = build_config({"kicad_version_max": "6.0"})
     builder = KicadBuilder(str(isolation), config=config)
@@ -381,6 +394,15 @@ def test_icon(isolation):
     config = build_config({"icon": tf.name})
     builder = KicadBuilder(str(isolation), config=config)
     assert builder.config.icon == Path(tf.name)
+
+
+def test_icon_missing(isolation):
+    builder = KicadBuilder(str(isolation), config={})
+    with pytest.raises(
+        TypeError,
+        match="Field `tool.hatch.build.targets.kicad-package.icon` not found"
+    ):
+        _ = builder.config.icon
 
 
 def test_icon_does_not_exist(isolation):
@@ -493,3 +515,15 @@ def test_build_standard(isolation):
         name = Path(s.name).name
         expected.append(f"plugin/{name}")
     assert len(in_zip) == len(expected) and sorted(in_zip) == sorted(expected)
+
+
+def test_build_standard_wrong_config(monkeypatch, isolation):
+    def mock_abort(*args, **kwargs):
+        _ = args, kwargs
+        msg = "Abort called"
+        raise Exception(msg)
+    monkeypatch.setattr("hatchling.bridge.app.Application.abort", mock_abort)
+    config = {"project": {"name": "Plugin", "version": "0.1.0"}}
+    builder = KicadBuilder(str(isolation), config=config)
+    with pytest.raises(Exception, match="Abort called"):
+        builder.build_standard(str(isolation))
