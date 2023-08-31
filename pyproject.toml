@@ -51,6 +51,7 @@ exclude = [
 [tool.hatch.envs.default]
 dependencies = [
   "coverage[toml]>=6.5",
+  "coveralls>=3.0.0",
   "pytest",
 ]
 [tool.hatch.envs.default.scripts]
@@ -156,7 +157,7 @@ source_pkgs = ["hatch_kicad", "tests"]
 branch = true
 parallel = true
 omit = [
-  "src/hatch_kicad/__about__.py",
+  "src/hatch_kicad/_version.py",
 ]
 
 [tool.coverage.paths]
