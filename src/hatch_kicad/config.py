@@ -8,6 +8,8 @@ from typing import Any, TypedDict
 
 from hatchling.builders.config import BuilderConfig
 
+from hatch_kicad.licenses.supported import LICENSES
+
 
 class Person(TypedDict):
     name: str
@@ -173,6 +175,15 @@ class KicadBuilderConfig(BuilderConfig):
                     "failed to deduce license from `project.license` value.\n"
                     'Define `license = {text = "<value>"} in `project` or '
                     '`license = "<value>" in `tool.hatch.build.targets.kicad-package'
+                )
+                raise TypeError(msg)
+
+            if _license not in LICENSES:
+                repo = "https://github.com/adamws/hatch-kicad/"
+                url = f"{repo}blob/master/src/hatch_kicad/licenses/supported.py"
+                msg = (
+                    f"Invalid license value: `{_license}`\n"
+                    f"For the list of the supported licenses visit: {url}"
                 )
                 raise TypeError(msg)
             self.__license = _license

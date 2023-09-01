@@ -77,7 +77,7 @@ class TestRequiredStringOptions:
         builder = KicadBuilder(str(isolation), config={})
         with pytest.raises(
             TypeError,
-            match=f"Field `tool.hatch.build.targets.kicad-package.{name}` not found"
+            match=f"Field `tool.hatch.build.targets.kicad-package.{name}` not found",
         ):
             _ = getattr(builder.config, name)
 
@@ -252,6 +252,22 @@ def test_license(isolation):
     assert builder.config.license == "MIT"
 
 
+def test_license_wrong_value(isolation):
+    config = merge_dicts(
+        {"project": {"name": "Plugin", "license": "gpl-3.0"}},
+        build_config({"license": "unrecognized"}),
+    )
+    builder = KicadBuilder(str(isolation), config=config)
+    with pytest.raises(
+        TypeError,
+        match="Invalid license value: `unrecognized`\n"
+        "For the list of the supported licenses visit: "
+        "https://github.com/adamws/hatch-kicad/blob/master"
+        "/src/hatch_kicad/licenses/supported.py"
+    ):
+        _ = builder.config.license
+
+
 def test_license_wrong_type(isolation):
     config = merge_dicts(
         {"project": {"name": "Plugin", "license": "gpl-3.0"}},
@@ -399,8 +415,7 @@ def test_icon(isolation):
 def test_icon_missing(isolation):
     builder = KicadBuilder(str(isolation), config={})
     with pytest.raises(
-        TypeError,
-        match="Field `tool.hatch.build.targets.kicad-package.icon` not found"
+        TypeError, match="Field `tool.hatch.build.targets.kicad-package.icon` not found"
     ):
         _ = builder.config.icon
 
@@ -523,6 +538,7 @@ def test_build_standard_wrong_config(monkeypatch, isolation):
         _ = args, kwargs
         msg = "Abort called"
         raise Exception(msg)
+
     monkeypatch.setattr("hatchling.bridge.app.Application.abort", mock_abort)
     config = {"project": {"name": "Plugin", "version": "0.1.0"}}
     builder = KicadBuilder(str(isolation), config=config)
