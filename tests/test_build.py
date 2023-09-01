@@ -41,30 +41,27 @@ def test_default_versions(isolation):
 
 
 @pytest.mark.parametrize(
-    "name",
+    "name,value",
     [
-        "name",
-        "description",
-        "description_full",
-        "identifier",
-        "status",
-        "kicad_version",
+        ("name", "Plugin Name"),
+        ("description", "Plugin Description"),
+        ("description_full", "Plugin full description"),
+        ("identifier", "com.github.autor.plugin-name"),
+        ("status", "stable"),
+        ("kicad_version", "6.0"),
     ],
 )
 class TestRequiredStringOptions:
-    def test_option(self, name, isolation):
-        builder = KicadBuilder(
-            str(isolation), config=build_config({name: "property value"})
-        )
-        assert getattr(builder.config, name) == "property value"
+    def test_option(self, name, value, isolation):
+        builder = KicadBuilder(str(isolation), config=build_config({name: value}))
+        assert getattr(builder.config, name) == value
 
-    def test_option_join(self, name, isolation):
-        builder = KicadBuilder(
-            str(isolation), config=build_config({name: ["property", " value"]})
-        )
-        assert getattr(builder.config, name) == "property value"
+    def test_option_join(self, name, value, isolation):
+        builder = KicadBuilder(str(isolation), config=build_config({name: list(value)}))
+        assert getattr(builder.config, name) == value
 
-    def test_option_wrong_type(self, name, isolation):
+    def test_option_wrong_type(self, name, value, isolation):
+        _ = value
         builder = KicadBuilder(str(isolation), config=build_config({name: True}))
         with pytest.raises(
             TypeError,
@@ -73,7 +70,8 @@ class TestRequiredStringOptions:
         ):
             _ = getattr(builder.config, name)
 
-    def test_option_missing(self, name, isolation):
+    def test_option_missing(self, name, value, isolation):
+        _ = value
         builder = KicadBuilder(str(isolation), config={})
         with pytest.raises(
             TypeError,
@@ -263,7 +261,7 @@ def test_license_wrong_value(isolation):
         match="Invalid license value: `unrecognized`\n"
         "For the list of the supported licenses visit: "
         "https://github.com/adamws/hatch-kicad/blob/master"
-        "/src/hatch_kicad/licenses/supported.py"
+        "/src/hatch_kicad/licenses/supported.py",
     ):
         _ = builder.config.license
 
@@ -359,6 +357,19 @@ def test_resources_fallback_missing(isolation):
 def test_keep_on_update(isolation):
     builder = KicadBuilder(str(isolation), config={})
     assert builder.config.keep_on_update is None
+
+
+def test_status_wrong_value(isolation):
+    builder = KicadBuilder(str(isolation), config=build_config({"status": "unknown"}))
+    with pytest.raises(
+        TypeError,
+        match=(
+            "Invalid `tool.hatch.build.targets.kicad-package.status` value.\n"
+            "`status` must be one of: `stable`, `testing`, "
+            "`development` or `deprecated`."
+        ),
+    ):
+        _ = builder.config.status
 
 
 def test_kicad_version_max(isolation):

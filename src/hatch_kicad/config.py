@@ -222,7 +222,15 @@ class KicadBuilderConfig(BuilderConfig):
         deprecated: This package is no longer maintained.
         """
         if not self.__status:
-            self.__status = self.required_str("status")
+            status = self.required_str("status")
+            if status not in ["stable", "testing", "development", "deprecated"]:
+                msg = (
+                    f"Invalid `{self._BASE}.status` value.\n"
+                    "`status` must be one of: `stable`, `testing`, "
+                    "`development` or `deprecated`."
+                )
+                raise TypeError(msg)
+            self.__status = status
         return self.__status
 
     @property
