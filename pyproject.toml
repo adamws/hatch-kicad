@@ -30,9 +30,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/unknown/hatch-kicad#readme"
-Issues = "https://github.com/unknown/hatch-kicad/issues"
-Source = "https://github.com/unknown/hatch-kicad"
+Documentation = "https://github.com/adamws/hatch-kicad#readme"
+Issues = "https://github.com/adamws/hatch-kicad/issues"
+Source = "https://github.com/adamws/hatch-kicad"
 
 [project.entry-points.hatch]
 kicad = "hatch_kicad.hooks"
