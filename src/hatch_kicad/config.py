@@ -296,7 +296,7 @@ class KicadBuilderConfig(BuilderConfig):
             ],
         }
         # remove empty optional fields
-        for name in ["maintainer", "resources", "tags"]:
+        for name in ["maintainer", "tags"]:
             if not metadata[name]:
                 del metadata[name]
         if not metadata["versions"][0]["kicad_version_max"]:

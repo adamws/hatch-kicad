@@ -450,6 +450,7 @@ def test_get_metadata(isolation):
         "type": "plugin",
         "author": {"name": "bar", "contact": {"email": "bar@domain"}},
         "license": "MIT",
+        "resources": {},
         "versions": [{"kicad_version": "6.0", "status": "stable", "version": "0.0.1"}],
     }
 
