@@ -59,22 +59,17 @@ class KicadBuilder(BuilderInterface):
         zip_target = Path(directory, zip_name)
         metadata_target = Path(directory, "metadata.json")
 
-        metadata = None
         try:
-            metadata = self.config.get_metadata()
+            metadata: dict[str, Any] = self.config.get_metadata()
             with open(metadata_target, "w") as f:
                 json.dump(metadata, f, indent=4)
-        except Exception as e:
-            self.app.display_error(str(e))
-            self.app.abort("Build failed!")
 
-        with zipfile.ZipFile(zip_target, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for file in self.recurse_included_files():
-                zipf.write(file.path, f"plugin/{file.distribution_path}")
-            zipf.write(self.config.icon, "resources/icon.png")
-            zipf.write(metadata_target, "metadata.json")
+            with zipfile.ZipFile(zip_target, "w", zipfile.ZIP_DEFLATED) as zipf:
+                for file in self.recurse_included_files():
+                    zipf.write(file.path, f"plugin/{file.distribution_path}")
+                zipf.write(self.config.icon, "resources/icon.png")
+                zipf.write(metadata_target, "metadata.json")
 
-        if metadata:
             package_version = metadata["versions"][0]
             package_version.update(get_package_metadata(zip_target))
             self.app.display_info("package details:")
@@ -82,5 +77,8 @@ class KicadBuilder(BuilderInterface):
             # update with calculated metadata
             with open(metadata_target, "w") as f:
                 json.dump(metadata, f, indent=4)
+        except Exception as e:
+            self.app.display_error(str(e))
+            self.app.abort("Build failed!")
 
         return os.fspath(zip_target)
