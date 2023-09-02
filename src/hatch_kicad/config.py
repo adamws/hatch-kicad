@@ -163,10 +163,11 @@ class KicadBuilderConfig(BuilderConfig):
             if not maintainer:
                 maintainers: list[Any] = self.builder.metadata.core.maintainers
                 if maintainers and "name" in maintainers[0]:
-                    maintainer = {
-                        "name": maintainers[0]["name"],
-                        "contact": {"email": maintainers[0].get("email", "-")},
-                    }
+                    name = maintainers[0]["name"]
+                    contact = {}
+                    if email := maintainers[0].get("email", {}):
+                        contact = {"email": email}
+                    maintainer = Person(name=name, contact=contact)
                 else:
                     maintainer = None
             self.__maintainer = maintainer

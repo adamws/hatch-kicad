@@ -113,159 +113,132 @@ def test_type(isolation):
     assert builder.config.type == "plugin"
 
 
-def test_author(isolation):
-    # when author specified by `kicad-package` ignore `project.authors`
-    config = merge_dicts(
-        {"project": {"authors": [{"email": "foo@domain", "name": "foo"}]}},
-        build_config({"author": {"name": "bar", "email": "bar@domain"}}),
-    )
-    builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.author == {"name": "bar", "contact": {"email": "bar@domain"}}
+@pytest.mark.parametrize(
+    "person",
+    ["author", "maintainer"],
+)
+class TestContactOptions:
+    def test_contact(self, person, isolation):
+        # when author/maintainer specified by `kicad-package`
+        # then ignore `project.authors` / `project.maintainers`
+        config = merge_dicts(
+            {"project": {person + "s": [{"email": "foo@domain", "name": "foo"}]}},
+            build_config({person: {"name": "bar", "email": "bar@domain"}}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        assert getattr(builder.config, person) == {
+            "name": "bar",
+            "contact": {"email": "bar@domain"},
+        }
 
-
-def test_author_more_contact(isolation):
-    # when author specified by `kicad-package` it can have
-    # more contact forms than just email
-    config = merge_dicts(
-        {"project": {"authors": [{"email": "foo@domain", "name": "foo"}]}},
-        build_config(
-            {
-                "author": {
-                    "name": "bar",
-                    "email": "bar@domain",
-                    "website": "https://bar.site",
+    def test_contact_more_information(self, person, isolation):
+        # when author/maintainer specified by `kicad-package` it can have
+        # more contact forms than just email
+        config = merge_dicts(
+            {"project": {person + "s": [{"email": "foo@domain", "name": "foo"}]}},
+            build_config(
+                {
+                    person: {
+                        "name": "bar",
+                        "email": "bar@domain",
+                        "website": "https://bar.site",
+                    }
                 }
-            }
-        ),
-    )
-    builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.author == {
-        "name": "bar",
-        "contact": {"email": "bar@domain", "website": "https://bar.site"},
-    }
+            ),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        assert getattr(builder.config, person) == {
+            "name": "bar",
+            "contact": {"email": "bar@domain", "website": "https://bar.site"},
+        }
 
+    def test_contact_wrong_type(self, person, isolation):
+        # author/maintainer must have name
+        builder = KicadBuilder(str(isolation), config=build_config({person: "bar"}))
+        with pytest.raises(
+            TypeError,
+            match=f"Field `tool.hatch.build.targets.kicad-package.{person}` "
+            "must be a dictionary",
+        ):
+            _ = getattr(builder.config, person)
 
-def test_author_wrong_type(isolation):
-    # author must have name
-    builder = KicadBuilder(str(isolation), config=build_config({"author": "bar"}))
-    with pytest.raises(
-        TypeError,
-        match="Field `tool.hatch.build.targets.kicad-package.author` "
-        "must be a dictionary",
-    ):
-        _ = builder.config.author
+    def test_contact_without_name(self, person, isolation):
+        # author/maintainer must have name
+        config = merge_dicts(
+            {"project": {person + "s": [{"email": "foo@domain", "name": "foo"}]}},
+            build_config({person: {"email": "bar@domain"}}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        with pytest.raises(
+            TypeError,
+            match=f"Field `tool.hatch.build.targets.kicad-package.{person}` "
+            "must have `name` property",
+        ):
+            _ = getattr(builder.config, person)
 
+    def test_contact_with_only_name(self, person, isolation):
+        # author/maintainer with name only should have empty contact information
+        config = merge_dicts(
+            {"project": {person + "s": [{"email": "foo@domain", "name": "foo"}]}},
+            build_config({person: {"name": "bar"}}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        assert getattr(builder.config, person) == {"name": "bar", "contact": {}}
 
-def test_author_without_name(isolation):
-    # author must have name
-    config = merge_dicts(
-        {"project": {"authors": [{"email": "foo@domain", "name": "foo"}]}},
-        build_config({"author": {"email": "bar@domain"}}),
-    )
-    builder = KicadBuilder(str(isolation), config=config)
-    with pytest.raises(
-        TypeError,
-        match="Field `tool.hatch.build.targets.kicad-package.author` "
-        "must have `name` property",
-    ):
-        _ = builder.config.author
+    def test_contact_fallback(self, person, isolation):
+        # when author/maintainer not specified by `kicad-package`,
+        # try to get first from `project.authors`/`project.maintainers`
+        config = {"project": {person + "s": [{"email": "foo@domain", "name": "foo"}]}}
+        builder = KicadBuilder(str(isolation), config=config)
+        assert getattr(builder.config, person) == {
+            "name": "foo",
+            "contact": {"email": "foo@domain"},
+        }
 
+    def test_contact_fallback_email_missing(self, person, isolation):
+        # when author/maintainer not specified by `kicad-package`,
+        # try to get first from `project.authors`/`project.maintainers`,
+        # if it has only name, use empty contact information
+        config = {"project": {person + "s": [{"name": "foo"}]}}
+        builder = KicadBuilder(str(isolation), config=config)
+        assert getattr(builder.config, person) == {"name": "foo", "contact": {}}
 
-def test_author_with_only_name(isolation):
-    # author with name only should have empty contact information
-    config = merge_dicts(
-        {"project": {"authors": [{"email": "foo@domain", "name": "foo"}]}},
-        build_config({"author": {"name": "bar"}}),
-    )
-    builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.author == {"name": "bar", "contact": {}}
+    def test_contact_fallback_missing(self, person, isolation):
+        # when author not specified by `kicad-package` and `project.authors`,
+        # raise an exception
+        config = {"project": {"name": "Plugin", "version": "0.1.0"}}
+        builder = KicadBuilder(str(isolation), config=config)
+        if person == "author":
+            with pytest.raises(
+                TypeError,
+                match=f"Field `tool.hatch.build.targets.kicad-package.{person}` not "
+                f"found, failed to get author from `project.{person}s` value",
+            ):
+                _ = getattr(builder.config, person)
+        # maintainer is optional so do nothing is fallback missing
+        elif person == "maintainer":
+            assert getattr(builder.config, person) is None
+        else:
+            raise RuntimeError
 
-
-def test_author_fallback(isolation):
-    # when author not specified by `kicad-package`,
-    # try to get first from `project.authors`
-    config = {"project": {"authors": [{"email": "foo@domain", "name": "foo"}]}}
-    builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.author == {"name": "foo", "contact": {"email": "foo@domain"}}
-
-
-def test_author_fallback_email_missing(isolation):
-    # when author not specified by `kicad-package`,
-    # try to get first from `project.authors`,
-    # if it has only name, use empty contact information
-    config = {"project": {"authors": [{"name": "foo"}]}}
-    builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.author == {"name": "foo", "contact": {}}
-
-
-def test_author_fallback_missing(isolation):
-    # when author not specified by `kicad-package` and `project.authors`,
-    # raise an exception
-    config = {"project": {"name": "Plugin", "version": "0.1.0"}}
-    builder = KicadBuilder(str(isolation), config=config)
-    with pytest.raises(
-        TypeError,
-        match="Field `tool.hatch.build.targets.kicad-package.author` not found, "
-        "failed to get author from `project.authors` value",
-    ):
-        _ = builder.config.author
-
-
-def test_author_fallback_email_only(isolation):
-    # when author not specified by `kicad-package`
-    # and first author from `project.authors` has email only, raise an exception
-    config = {"project": {"authors": [{"email": "foo@domain"}]}}
-    builder = KicadBuilder(str(isolation), config=config)
-    with pytest.raises(
-        TypeError,
-        match="Field `tool.hatch.build.targets.kicad-package.author` not found, "
-        "failed to get author from `project.authors` value",
-    ):
-        _ = builder.config.author
-
-
-def test_maintainer(isolation):
-    # when maintainer specified by `kicad-package` ignore `project.maintainers`
-    config = merge_dicts(
-        {"project": {"maintainers": [{"email": "foo@domain", "name": "foo"}]}},
-        build_config({"maintainer": {"name": "bar", "email": "bar@domain"}}),
-    )
-    builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.maintainer == {
-        "name": "bar",
-        "contact": {"email": "bar@domain"},
-    }
-
-
-def test_maintainer_fallback(isolation):
-    # when maintainer not specified by `kicad-package`,
-    # try to get first from `project.maintainers`
-    config = {"project": {"maintainers": [{"email": "foo@domain", "name": "foo"}]}}
-    builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.maintainer == {
-        "name": "foo",
-        "contact": {"email": "foo@domain"},
-    }
-
-
-def test_maintainer_fallback_missing(isolation):
-    # when maintainer not specified by `kicad-package`
-    # and `project.maintainers` missing,
-    # return empty dictionary (maintainer is not required)
-    config = {"project": {"name": "Plugin", "version": "0.1.0"}}
-    builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.maintainer is None
-
-
-def test_maintainer_wrong_type(isolation):
-    # author must have name
-    builder = KicadBuilder(str(isolation), config=build_config({"maintainer": "bar"}))
-    with pytest.raises(
-        TypeError,
-        match="Field `tool.hatch.build.targets.kicad-package.maintainer` "
-        "must be a dictionary",
-    ):
-        _ = builder.config.maintainer
+    def test_contact_fallback_email_only(self, person, isolation):
+        config = {"project": {person + "s": [{"email": "foo@domain"}]}}
+        builder = KicadBuilder(str(isolation), config=config)
+        # when author not specified by `kicad-package`
+        # and first from `project.authors` has email only,
+        # raise an exception
+        if person == "author":
+            with pytest.raises(
+                TypeError,
+                match=f"Field `tool.hatch.build.targets.kicad-package.{person}` not "
+                f"found, failed to get {person} from `project.{person}s` value",
+            ):
+                _ = getattr(builder.config, person)
+        # maintainer is optional so do nothing is fallback is not valid
+        elif person == "maintainer":
+            assert getattr(builder.config, person) is None
+        else:
+            raise RuntimeError
 
 
 def test_license(isolation):
