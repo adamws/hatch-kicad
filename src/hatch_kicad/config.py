@@ -112,6 +112,33 @@ class KicadBuilderConfig(BuilderConfig):
     def type(self) -> str:
         return "plugin"
 
+    def validate_person(self, person: Person, field_name: str) -> None:
+        name_length = len(person["name"])
+        max_length = 500
+        if name_length > max_length:
+            msg = (
+                f"Field `{field_name}` `name` property too long, "
+                f"can be {max_length} character long, got {name_length}"
+            )
+            raise TypeError(msg)
+
+        contact = person["contact"]
+        for k, v in contact.items():
+            contact_value_length = len(v)
+            if contact_value_length > max_length:
+                msg = (
+                    f"Field `{field_name}` `{k}` property too long, "
+                    f"can be {max_length} character long, got {contact_value_length}"
+                )
+                raise TypeError(msg)
+            if not re.match(self._CONTACT_KEY_REGEX, k):
+                msg = (
+                    f"Field `{field_name}` `{k}` property has "
+                    "invalid format, must match following regular "
+                    f"expression: `{self._CONTACT_KEY_REGEX}`"
+                )
+                raise TypeError(msg)
+
     def get_person(self, name: str) -> Person | None:
         if name in self.target_config:
             person = self.target_config[name]
@@ -121,40 +148,11 @@ class KicadBuilderConfig(BuilderConfig):
             if "name" not in person:
                 msg = f"Field `{self._BASE}.{name}` must have `name` property"
                 raise TypeError(msg)
-            name = person["name"]
-            contact = person
-            del contact["name"]
-            return {"name": name, "contact": contact}
+            contact = {k: v for k, v in person.items() if k != "name"}
+            person = Person(name=person["name"], contact=contact)
+            self.validate_person(person, f"{self._BASE}.{name}")
+            return person
         return None
-
-    def validate_person(self, person: Person, name: str) -> None:
-        name_length = len(person["name"])
-        max_length = 500
-        if name_length > max_length:
-            msg = (
-                f"Field `{self._BASE}.{name}` "
-                f"`name` property too long, can be {max_length} character long, "
-                f"got {name_length}"
-            )
-            raise TypeError(msg)
-
-        contact = person["contact"]
-        for k, v in contact.items():
-            contact_value_length = len(v)
-            if contact_value_length > max_length:
-                msg = (
-                    f"Field `{self._BASE}.{name}` "
-                    f"`{k}` property too long, can be {max_length} character long, "
-                    f"got {contact_value_length}"
-                )
-                raise TypeError(msg)
-            if not re.match(self._CONTACT_KEY_REGEX, k):
-                msg = (
-                    f"Field `{self._BASE}.{name}` `{k}` property has "
-                    "invalid format, must match following regular "
-                    f"expression: `{self._CONTACT_KEY_REGEX}`"
-                )
-                raise TypeError(msg)
 
     @property
     def author(self) -> Person:
@@ -174,13 +172,13 @@ class KicadBuilderConfig(BuilderConfig):
                     if email := authors[0].get("email", {}):
                         contact = {"email": email}
                     author = Person(name=name, contact=contact)
+                    self.validate_person(author, "project.authors[0]")
                 else:
                     msg = (
                         f"Field `{self._BASE}.author` not found, "
                         "failed to get author from `project.authors` value"
                     )
                     raise TypeError(msg)
-            self.validate_person(author, "author")
             self.__author = author
         return self.__author
 
@@ -200,11 +198,14 @@ class KicadBuilderConfig(BuilderConfig):
                     if email := maintainers[0].get("email", {}):
                         contact = {"email": email}
                     maintainer = Person(name=name, contact=contact)
-                    self.validate_person(maintainer, "maintainer")
+                    try:
+                        self.validate_person(maintainer, "project.maintainers[0]")
+                    except Exception:
+                        # if fallback maintainer does not meet schema,
+                        # ignore it since is not required option
+                        maintainer = None
                 else:
                     maintainer = None
-            else:
-                self.validate_person(maintainer, "maintainer")
             self.__maintainer = maintainer
         return self.__maintainer
 

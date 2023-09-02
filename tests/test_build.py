@@ -239,6 +239,26 @@ class TestContactOptions:
             "contact": {"email": "foo@domain"},
         }
 
+    def test_contact_fallback_name_too_long(self, person, isolation):
+        # if parameters extended it would requrie test adjustment:
+        assert person in ["author", "maintainer"]
+        config = {
+            "project": {person + "s": [{"email": "foo@domain", "name": 501 * "a"}]}
+        }
+        builder = KicadBuilder(str(isolation), config=config)
+        if person == "author":
+            with pytest.raises(
+                TypeError,
+                match=re.escape(
+                    f"Field `project.{person}s[0]` `name` property "
+                    "too long, can be 500 character long, got 501"
+                ),
+            ):
+                _ = getattr(builder.config, person)
+        # maintainer is optional so do nothing is fallback is not valid
+        else:
+            assert getattr(builder.config, person) is None
+
     def test_contact_fallback_email_missing(self, person, isolation):
         # when author/maintainer not specified by `kicad-package`,
         # try to get first from `project.authors`/`project.maintainers`,
