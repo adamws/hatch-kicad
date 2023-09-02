@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 import zipfile
 from pathlib import Path
@@ -131,6 +132,49 @@ class TestContactOptions:
             "contact": {"email": "bar@domain"},
         }
 
+    def test_contact_name_too_long(self, person, isolation):
+        config = merge_dicts(
+            {"project": {person + "s": [{"email": "foo@domain", "name": "foo"}]}},
+            build_config({person: {"name": 501 * "a", "email": "bar@domain"}}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        with pytest.raises(
+            TypeError,
+            match=f"Field `tool.hatch.build.targets.kicad-package.{person}` "
+            "`name` property too long, can be 500 character long, got 501",
+        ):
+            _ = getattr(builder.config, person)
+
+    def test_contact_details_wrong_format_key(self, person, isolation):
+        config = merge_dicts(
+            {"project": {person + "s": [{"email": "foo@domain", "name": "foo"}]}},
+            build_config({person: {"name": "bar", "---email": "bar@domain"}}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        regex_pattern = r"^[a-zA-Z][-a-zA-Z0-9 ]{0,48}[a-zA-Z0-9]$"
+        with pytest.raises(
+            TypeError,
+            match=re.escape(
+                f"Field `tool.hatch.build.targets.kicad-package.{person}` "
+                "`---email` property has invalid format, must match following regular "
+                f"expression: `{regex_pattern}`"
+            ),
+        ):
+            _ = getattr(builder.config, person)
+
+    def test_contact_details_too_long(self, person, isolation):
+        config = merge_dicts(
+            {"project": {person + "s": [{"email": "foo@domain", "name": "foo"}]}},
+            build_config({person: {"name": "bar", "email": 501 * "a"}}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        with pytest.raises(
+            TypeError,
+            match=f"Field `tool.hatch.build.targets.kicad-package.{person}` "
+            "`email` property too long, can be 500 character long, got 501",
+        ):
+            _ = getattr(builder.config, person)
+
     def test_contact_more_information(self, person, isolation):
         # when author/maintainer specified by `kicad-package` it can have
         # more contact forms than just email
@@ -204,10 +248,12 @@ class TestContactOptions:
         assert getattr(builder.config, person) == {"name": "foo", "contact": {}}
 
     def test_contact_fallback_missing(self, person, isolation):
-        # when author not specified by `kicad-package` and `project.authors`,
-        # raise an exception
+        # if parameters extended it would requrie test adjustment:
+        assert person in ["author", "maintainer"]
         config = {"project": {"name": "Plugin", "version": "0.1.0"}}
         builder = KicadBuilder(str(isolation), config=config)
+        # when author not specified by `kicad-package` and `project.authors`,
+        # raise an exception
         if person == "author":
             with pytest.raises(
                 TypeError,
@@ -216,12 +262,12 @@ class TestContactOptions:
             ):
                 _ = getattr(builder.config, person)
         # maintainer is optional so do nothing is fallback missing
-        elif person == "maintainer":
-            assert getattr(builder.config, person) is None
         else:
-            raise RuntimeError
+            assert getattr(builder.config, person) is None
 
     def test_contact_fallback_email_only(self, person, isolation):
+        # if parameters extended it would requrie test adjustment:
+        assert person in ["author", "maintainer"]
         config = {"project": {person + "s": [{"email": "foo@domain"}]}}
         builder = KicadBuilder(str(isolation), config=config)
         # when author not specified by `kicad-package`
@@ -235,10 +281,8 @@ class TestContactOptions:
             ):
                 _ = getattr(builder.config, person)
         # maintainer is optional so do nothing is fallback is not valid
-        elif person == "maintainer":
-            assert getattr(builder.config, person) is None
         else:
-            raise RuntimeError
+            assert getattr(builder.config, person) is None
 
 
 def test_license(isolation):

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -18,6 +19,7 @@ class Person(TypedDict):
 
 class KicadBuilderConfig(BuilderConfig):
     _BASE = "tool.hatch.build.targets.kicad-package"
+    _CONTACT_KEY_REGEX = r"^[a-zA-Z][-a-zA-Z0-9 ]{0,48}[a-zA-Z0-9]$"
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -125,6 +127,35 @@ class KicadBuilderConfig(BuilderConfig):
             return {"name": name, "contact": contact}
         return None
 
+    def validate_person(self, person: Person, name: str) -> None:
+        name_length = len(person["name"])
+        max_length = 500
+        if name_length > max_length:
+            msg = (
+                f"Field `{self._BASE}.{name}` "
+                f"`name` property too long, can be {max_length} character long, "
+                f"got {name_length}"
+            )
+            raise TypeError(msg)
+
+        contact = person["contact"]
+        for k, v in contact.items():
+            contact_value_length = len(v)
+            if contact_value_length > max_length:
+                msg = (
+                    f"Field `{self._BASE}.{name}` "
+                    f"`{k}` property too long, can be {max_length} character long, "
+                    f"got {contact_value_length}"
+                )
+                raise TypeError(msg)
+            if not re.match(self._CONTACT_KEY_REGEX, k):
+                msg = (
+                    f"Field `{self._BASE}.{name}` `{k}` property has "
+                    "invalid format, must match following regular "
+                    f"expression: `{self._CONTACT_KEY_REGEX}`"
+                )
+                raise TypeError(msg)
+
     @property
     def author(self) -> Person:
         """
@@ -149,6 +180,7 @@ class KicadBuilderConfig(BuilderConfig):
                         "failed to get author from `project.authors` value"
                     )
                     raise TypeError(msg)
+            self.validate_person(author, "author")
             self.__author = author
         return self.__author
 
@@ -168,8 +200,11 @@ class KicadBuilderConfig(BuilderConfig):
                     if email := maintainers[0].get("email", {}):
                         contact = {"email": email}
                     maintainer = Person(name=name, contact=contact)
+                    self.validate_person(maintainer, "maintainer")
                 else:
                     maintainer = None
+            else:
+                self.validate_person(maintainer, "maintainer")
             self.__maintainer = maintainer
         return self.__maintainer
 
