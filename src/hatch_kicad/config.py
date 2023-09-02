@@ -36,7 +36,7 @@ class KicadBuilderConfig(BuilderConfig):
         self.__tags: list[str] | None = None
         self.__icon: Path | None = None
 
-    def required_str(self, name: str) -> str:
+    def required_str(self, name: str, max_length: int = -1) -> str:
         if name in self.target_config:
             value = self.target_config[name]
             if not isinstance(value, str) and not (
@@ -51,6 +51,14 @@ class KicadBuilderConfig(BuilderConfig):
             raise TypeError(msg)
         if isinstance(value, list):
             value = "".join(value)
+        if max_length > 0:
+            value_length = len(value)
+            if value_length > max_length:
+                msg = (
+                    f"Field `{self._BASE}.{name}` too long, "
+                    f"can be {max_length} character long, got {value_length}"
+                )
+                raise TypeError(msg)
         return value
 
     @property
@@ -59,7 +67,7 @@ class KicadBuilderConfig(BuilderConfig):
         The human-readable name of the package
         """
         if not self.__name:
-            self.__name = self.required_str("name")
+            self.__name = self.required_str("name", max_length=200)
         return self.__name
 
     @property
@@ -70,7 +78,7 @@ class KicadBuilderConfig(BuilderConfig):
         May contain a maximum of 150 characters.
         """
         if not self.__description:
-            self.__description = self.required_str("description")
+            self.__description = self.required_str("description", max_length=500)
         return self.__description
 
     @property
@@ -81,7 +89,9 @@ class KicadBuilderConfig(BuilderConfig):
         May be a string or list of strings with included line breaks.
         """
         if not self.__description_full:
-            self.__description_full = self.required_str("description_full")
+            self.__description_full = self.required_str(
+                "description_full", max_length=5000
+            )
         return self.__description_full
 
     @property

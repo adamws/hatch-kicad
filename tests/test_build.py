@@ -80,6 +80,33 @@ class TestRequiredStringOptions:
             _ = getattr(builder.config, name)
 
 
+@pytest.mark.parametrize(
+    "name,max_length",
+    [
+        ("name", 200),
+        ("description", 500),
+        ("description_full", 5000),
+    ],
+)
+class TestLengthLimitedStringOptions:
+    def test_option_max_length(self, name, max_length, isolation):
+        config = build_config({name: max_length * "a"})
+        builder = KicadBuilder(str(isolation), config=config)
+        assert getattr(builder.config, name) == max_length * "a"
+
+    def test_option_too_long(self, name, max_length, isolation):
+        config = build_config({name: (max_length + 1) * "a"})
+        builder = KicadBuilder(str(isolation), config=config)
+        with pytest.raises(
+            TypeError,
+            match=(
+                f"Field `tool.hatch.build.targets.kicad-package.{name}` too long, "
+                f"can be {max_length} character long, got {max_length + 1}"
+            ),
+        ):
+            _ = getattr(builder.config, name)
+
+
 def test_type(isolation):
     # type is always equal 'plugin'
     builder = KicadBuilder(str(isolation), config={})
