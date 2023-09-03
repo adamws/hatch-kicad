@@ -90,6 +90,12 @@ Archive root
 
 For more details see [kicad documentation](https://dev-docs.kicad.org/en/addons/).
 
+> [!WARNING]
+> Package `version` value is derived from **required** `project.version` field.
+> KiCad version requirement is not compatible with [PEP-0440](https://peps.python.org/pep-0440/) so some
+> valid python values won't pass PCM validation check. In such cases
+> `kicad-package` plugin uses only [`base version`](https://packaging.pypa.io/en/stable/version.html#packaging.version.Version.base_version) value.
+
 ### How to run
 
 To start build process, run `hatch build -t kicad-package`. If build successful, calculated `download_sha256`, `download_size` and `install_size` fields should be printed:
