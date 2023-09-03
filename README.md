@@ -106,12 +106,9 @@ $ hatch build --target kicad-package
 Running custom, version: standard
 package details:
 {
-    "version": "0.7",
-    "status": "stable",
-    "kicad_version": "6.0",
-    "download_sha256": "52cc67f37fcb272ac20ee5d8d50b214143e989c56a573bb49cc16a997d2dc701",
-    "download_size": 33295,
-    "install_size": 106682
+  "download_sha256": "52cc67f37fcb272ac20ee5d8d50b214143e989c56a573bb49cc16a997d2dc701",
+  "download_size": 33295,
+  "install_size": 106682
 }
 dist/plugin-0.7.zip
 ```
