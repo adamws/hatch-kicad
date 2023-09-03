@@ -55,7 +55,7 @@ class KicadBuilderConfig(BuilderConfig):
                 raise TypeError(msg)
         else:
             msg = f"Field `{self._BASE}.{name}` not found"
-            raise TypeError(msg)
+            raise ValueError(msg)
         if isinstance(value, list):
             value = "".join(value)
         if max_length > 0:
@@ -65,7 +65,7 @@ class KicadBuilderConfig(BuilderConfig):
                     f"Field `{self._BASE}.{name}` too long, "
                     f"can be {max_length} character long, got {value_length}"
                 )
-                raise TypeError(msg)
+                raise ValueError(msg)
         return value
 
     @property
@@ -125,7 +125,7 @@ class KicadBuilderConfig(BuilderConfig):
                 f"Field `{field_name}` `name` property too long, "
                 f"can be {max_length} character long, got {name_length}"
             )
-            raise TypeError(msg)
+            raise ValueError(msg)
 
         contact = person["contact"]
         for k, v in contact.items():
@@ -135,14 +135,14 @@ class KicadBuilderConfig(BuilderConfig):
                     f"Field `{field_name}` `{k}` property too long, "
                     f"can be {max_length} character long, got {contact_value_length}"
                 )
-                raise TypeError(msg)
+                raise ValueError(msg)
             if not re.match(self._CONTACT_KEY_REGEX, k):
                 msg = (
                     f"Field `{field_name}` `{k}` property has "
                     "invalid format, must match following regular "
                     f"expression: `{self._CONTACT_KEY_REGEX}`"
                 )
-                raise TypeError(msg)
+                raise ValueError(msg)
 
     def get_person(self, name: str) -> Person | None:
         if name in self.target_config:
@@ -183,7 +183,7 @@ class KicadBuilderConfig(BuilderConfig):
                         f"Field `{self._BASE}.author` not found, "
                         "failed to get author from `project.authors` value"
                     )
-                    raise TypeError(msg)
+                    raise ValueError(msg)
             self.__author = author
         return self.__author
 
@@ -228,7 +228,7 @@ class KicadBuilderConfig(BuilderConfig):
                     'Define `license = {text = "<value>"} in `project` or '
                     '`license = "<value>" in `tool.hatch.build.targets.kicad-package'
                 )
-                raise TypeError(msg)
+                raise ValueError(msg)
 
             if _license not in LICENSES:
                 repo = "https://github.com/adamws/hatch-kicad/"
@@ -237,7 +237,7 @@ class KicadBuilderConfig(BuilderConfig):
                     f"Invalid license value: `{_license}`\n"
                     f"For the list of the supported licenses visit: {url}"
                 )
-                raise TypeError(msg)
+                raise ValueError(msg)
             self.__license = _license
         return self.__license
 
@@ -281,7 +281,7 @@ class KicadBuilderConfig(BuilderConfig):
                     "`status` must be one of: `stable`, `testing`, "
                     "`development` or `deprecated`."
                 )
-                raise TypeError(msg)
+                raise ValueError(msg)
             self.__status = status
         return self.__status
 
@@ -337,10 +337,10 @@ class KicadBuilderConfig(BuilderConfig):
                     raise TypeError(msg)
                 if not Path(icon).is_file():
                     msg = f"Field `{self._BASE}.icon` must point to a file"
-                    raise TypeError(msg)
+                    raise ValueError(msg)
             else:
                 msg = f"Field `{self._BASE}.icon` not found"
-                raise TypeError(msg)
+                raise ValueError(msg)
             self.__icon = Path(icon)
         return self.__icon
 

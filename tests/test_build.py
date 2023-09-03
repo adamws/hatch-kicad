@@ -78,7 +78,7 @@ class TestRequiredStringOptions:
         _ = value
         builder = KicadBuilder(str(isolation), config={})
         with pytest.raises(
-            TypeError,
+            ValueError,
             match=f"Field `tool.hatch.build.targets.kicad-package.{name}` not found",
         ):
             _ = getattr(builder.config, name)
@@ -102,7 +102,7 @@ class TestLengthLimitedStringOptions:
         config = build_config({name: (max_length + 1) * "a"})
         builder = KicadBuilder(str(isolation), config=config)
         with pytest.raises(
-            TypeError,
+            ValueError,
             match=(
                 f"Field `tool.hatch.build.targets.kicad-package.{name}` too long, "
                 f"can be {max_length} character long, got {max_length + 1}"
@@ -142,7 +142,7 @@ class TestContactOptions:
         )
         builder = KicadBuilder(str(isolation), config=config)
         with pytest.raises(
-            TypeError,
+            ValueError,
             match=f"Field `tool.hatch.build.targets.kicad-package.{person}` "
             "`name` property too long, can be 500 character long, got 501",
         ):
@@ -156,7 +156,7 @@ class TestContactOptions:
         builder = KicadBuilder(str(isolation), config=config)
         regex_pattern = r"^[a-zA-Z][-a-zA-Z0-9 ]{0,48}[a-zA-Z0-9]$"
         with pytest.raises(
-            TypeError,
+            ValueError,
             match=re.escape(
                 f"Field `tool.hatch.build.targets.kicad-package.{person}` "
                 "`---email` property has invalid format, must match following regular "
@@ -172,7 +172,7 @@ class TestContactOptions:
         )
         builder = KicadBuilder(str(isolation), config=config)
         with pytest.raises(
-            TypeError,
+            ValueError,
             match=f"Field `tool.hatch.build.targets.kicad-package.{person}` "
             "`email` property too long, can be 500 character long, got 501",
         ):
@@ -251,7 +251,7 @@ class TestContactOptions:
         builder = KicadBuilder(str(isolation), config=config)
         if person == "author":
             with pytest.raises(
-                TypeError,
+                ValueError,
                 match=re.escape(
                     f"Field `project.{person}s[0]` `name` property "
                     "too long, can be 500 character long, got 501"
@@ -279,7 +279,7 @@ class TestContactOptions:
         # raise an exception
         if person == "author":
             with pytest.raises(
-                TypeError,
+                ValueError,
                 match=f"Field `tool.hatch.build.targets.kicad-package.{person}` not "
                 f"found, failed to get author from `project.{person}s` value",
             ):
@@ -298,7 +298,7 @@ class TestContactOptions:
         # raise an exception
         if person == "author":
             with pytest.raises(
-                TypeError,
+                ValueError,
                 match=f"Field `tool.hatch.build.targets.kicad-package.{person}` not "
                 f"found, failed to get {person} from `project.{person}s` value",
             ):
@@ -324,7 +324,7 @@ def test_license_wrong_value(isolation):
     )
     builder = KicadBuilder(str(isolation), config=config)
     with pytest.raises(
-        TypeError,
+        ValueError,
         match="Invalid license value: `unrecognized`\n"
         "For the list of the supported licenses visit: "
         "https://github.com/adamws/hatch-kicad/blob/master"
@@ -357,7 +357,7 @@ def test_license_fallback_missing(isolation):
     config = {"project": {"name": "Plugin"}}
     builder = KicadBuilder(str(isolation), config=config)
     with pytest.raises(
-        TypeError,
+        ValueError,
         match=(
             "Field `tool.hatch.build.targets.kicad-package.license` not found, "
             "failed to deduce license from `project.license` value.\n"
@@ -429,7 +429,7 @@ def test_keep_on_update(isolation):
 def test_status_wrong_value(isolation):
     builder = KicadBuilder(str(isolation), config=build_config({"status": "unknown"}))
     with pytest.raises(
-        TypeError,
+        ValueError,
         match=(
             "Invalid `tool.hatch.build.targets.kicad-package.status` value.\n"
             "`status` must be one of: `stable`, `testing`, "
@@ -493,7 +493,8 @@ def test_icon(isolation):
 def test_icon_missing(isolation):
     builder = KicadBuilder(str(isolation), config={})
     with pytest.raises(
-        TypeError, match="Field `tool.hatch.build.targets.kicad-package.icon` not found"
+        ValueError,
+        match="Field `tool.hatch.build.targets.kicad-package.icon` not found",
     ):
         _ = builder.config.icon
 
@@ -502,7 +503,7 @@ def test_icon_does_not_exist(isolation):
     config = build_config({"icon": "src/icon.png"})
     builder = KicadBuilder(str(isolation), config=config)
     with pytest.raises(
-        TypeError,
+        ValueError,
         match="Field `tool.hatch.build.targets.kicad-package.icon` "
         "must point to a file",
     ):
