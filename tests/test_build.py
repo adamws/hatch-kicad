@@ -519,6 +519,27 @@ def test_icon_wrong_type(isolation):
         _ = builder.config.icon
 
 
+def test_version(isolation):
+    config = {"project": {"name": "Plugin", "version": "0.1.0"}}
+    builder = KicadBuilder(str(isolation), config=config)
+    assert builder.config.version == "0.1.0"
+
+
+def test_version_illegal_format(isolation):
+    config = {"project": {"name": "Plugin", "version": "0.1.0-dev"}}
+    builder = KicadBuilder(str(isolation), config=config)
+
+    regex_pattern = r"^\d{1,4}(\.\d{1,4}(\.\d{1,6})?)?$"
+    with pytest.raises(
+        TypeError,
+        match=re.escape(
+            f"Field `project.version` has invalid format, "
+            f"must match following regular expression: `{regex_pattern}`"
+        ),
+    ):
+        _ = builder.config.version
+
+
 def test_get_metadata(isolation):
     data = {
         "name": "Plugin Name",

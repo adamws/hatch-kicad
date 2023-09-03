@@ -20,6 +20,9 @@ class Person(TypedDict):
 class KicadBuilderConfig(BuilderConfig):
     _BASE = "tool.hatch.build.targets.kicad-package"
     _CONTACT_KEY_REGEX = r"^[a-zA-Z][-a-zA-Z0-9 ]{0,48}[a-zA-Z0-9]$"
+    # KiCad allow only this simplistic version scheme:
+    # (taken from https://go.kicad.org/pcm/schemas/v1)
+    _VERSION_REGEX = r"^\d{1,4}(\.\d{1,4}(\.\d{1,6})?)?$"
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -37,6 +40,7 @@ class KicadBuilderConfig(BuilderConfig):
         self.__kicad_version_max: str | None = None
         self.__tags: list[str] | None = None
         self.__icon: Path | None = None
+        self.__version: str | None = None
 
     def required_str(self, name: str, max_length: int = -1) -> str:
         if name in self.target_config:
@@ -339,6 +343,20 @@ class KicadBuilderConfig(BuilderConfig):
             self.__icon = Path(icon)
         return self.__icon
 
+    @property
+    def version(self) -> str:
+        if not self.__version:
+            version = self.builder.metadata.version
+            if not re.match(self._VERSION_REGEX, version):
+                msg = (
+                    f"Field `project.version` has invalid format, "
+                    "must match following regular "
+                    f"expression: `{self._VERSION_REGEX}`"
+                )
+                raise TypeError(msg)
+            self.__version = version
+        return self.__version
+
     def get_metadata(self) -> dict[str, Any]:
         metadata: dict[str, Any] = {
             "$schema": "https://go.kicad.org/pcm/schemas/v1",
@@ -354,7 +372,7 @@ class KicadBuilderConfig(BuilderConfig):
             "tags": self.tags,
             "versions": [
                 {
-                    "version": self.builder.metadata.version,
+                    "version": self.version,
                     "status": self.status,
                     "kicad_version": self.kicad_version,
                     "kicad_version_max": self.kicad_version_max,
