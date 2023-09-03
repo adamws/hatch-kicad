@@ -652,12 +652,17 @@ class TestBuildStandard:
         # `download_size` and `install_size` keys and non-empty
         # values (calculating these values is tested separately by known zip file
         # so it can be skipped here for fake-generated one)
+        # it also should have empty `download_url` (just as a reminder for a user
+        # that this is required for submitting to PCM - setting this via
+        # configuration not supported yet)
         assert "versions" in metadata
         versions = metadata["versions"]
         assert len(versions) == 1
         for k in ["download_sha256", "download_size", "install_size"]:
             assert k in versions[0]
             assert versions[0][k]
+        assert "download_url" in versions[0]
+        assert versions[0]["download_url"] == ""
         for k, v in kwargs.items():
             assert versions[0][k] == v
 

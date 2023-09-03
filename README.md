@@ -116,6 +116,10 @@ dist/plugin-0.7.zip
 By default, output artifacts are located at `dist` directory. There should be two files: `<package>.zip` and `metadata.json`.
 For details how to use these files to submit package to KiCad addon repository see [this guide](https://dev-docs.kicad.org/en/addons/).
 
+> [!WARNING]
+> Package `download_url` is not set in produced `metadata.json` file.
+> It needs to be manually updated before submitting to KiCad's PCM
+
 ## License
 
 `hatch-kicad` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
