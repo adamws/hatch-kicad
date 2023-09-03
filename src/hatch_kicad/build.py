@@ -70,10 +70,12 @@ class KicadBuilder(BuilderInterface):
                 zipf.write(self.config.icon, "resources/icon.png")
                 zipf.write(metadata_target, "metadata.json")
 
-            package_version = metadata["versions"][0]
-            package_version.update(get_package_metadata(zip_target))
+            calculated_meta = get_package_metadata(zip_target)
             self.app.display_info("package details:")
-            self.app.display_info(json.dumps(package_version, indent=4))
+            self.app.display_info(json.dumps(calculated_meta, indent=2))
+
+            package_version = metadata["versions"][0]
+            package_version.update(calculated_meta)
             # update with calculated metadata
             with open(metadata_target, "w") as f:
                 json.dump(metadata, f, indent=4)
