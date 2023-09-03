@@ -59,6 +59,13 @@ class KicadBuilder(BuilderInterface):
         zip_target = Path(directory, zip_name)
         metadata_target = Path(directory, "metadata.json")
 
+        # log version 'fix' occurance
+        if self.metadata.version != self.config.version:
+            self.app.display_warning(
+                f"Found KiCad incompatible version number: {self.metadata.version}\n"
+                f"Using simplified value: {self.config.version}"
+            )
+
         try:
             metadata: dict[str, Any] = self.config.get_metadata()
             with open(metadata_target, "w") as f:

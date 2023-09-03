@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from hatchling.builders.config import BuilderConfig
+from packaging.version import parse
 
 from hatch_kicad.licenses.supported import LICENSES
 
@@ -348,12 +349,7 @@ class KicadBuilderConfig(BuilderConfig):
         if not self.__version:
             version = self.builder.metadata.version
             if not re.match(self._VERSION_REGEX, version):
-                msg = (
-                    f"Field `project.version` has invalid format, "
-                    "must match following regular "
-                    f"expression: `{self._VERSION_REGEX}`"
-                )
-                raise TypeError(msg)
+                version = str(parse(version).base_version)
             self.__version = version
         return self.__version
 

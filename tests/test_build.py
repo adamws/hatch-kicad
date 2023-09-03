@@ -525,16 +525,20 @@ def test_version(isolation):
     assert builder.config.version == "0.1.0"
 
 
-def test_version_illegal_format(isolation):
-    config = {"project": {"name": "Plugin", "version": "0.1.0-dev"}}
+def test_version_simplification(isolation):
+    config = {"project": {"name": "Plugin", "version": "0.1.0-alpha"}}
     builder = KicadBuilder(str(isolation), config=config)
+    assert builder.config.version == "0.1.0"
 
-    regex_pattern = r"^\d{1,4}(\.\d{1,4}(\.\d{1,6})?)?$"
+
+def test_version_unrecoverable_illegal_format(isolation):
+    config = {"project": {"name": "Plugin", "version": "dev0.1.0"}}
+    builder = KicadBuilder(str(isolation), config=config)
     with pytest.raises(
-        TypeError,
-        match=re.escape(
-            f"Field `project.version` has invalid format, "
-            f"must match following regular expression: `{regex_pattern}`"
+        ValueError,
+        match=(
+            "Invalid version `dev0.1.0` from field `project.version`, "
+            "see https://peps.python.org/pep-0440/"
         ),
     ):
         _ = builder.config.version
@@ -703,7 +707,7 @@ class TestBuildStandard:
     def test_build_ignores_failed_maintainer_fallback(
         self, isolation, fake_project, dist_dir
     ):
-        icon, sources = fake_project
+        icon, _ = fake_project
         data = merge_dicts(
             self._CONFIG_BASE,
             {"icon": icon.name, "sources": ["src"], "include": ["src/*.py"]},
@@ -738,3 +742,30 @@ class TestBuildStandard:
         builder = KicadBuilder(str(isolation), config=config)
         builder.build_standard(str(isolation))
         mock.assert_called_once_with("Build failed!")
+
+    def test_build_incompatible_version(
+        self, monkeypatch, isolation, fake_project, dist_dir
+    ):
+        mock = Mock()
+        monkeypatch.setattr("hatchling.bridge.app.Application.display_warning", mock)
+        icon, _ = fake_project
+        incompatible_version = "0.7.dev8+g2d9da6b.d20230903"
+        data = merge_dicts(
+            self._CONFIG_BASE,
+            {"icon": icon.name, "sources": ["src"], "include": ["src/*.py"]},
+        )
+        config = merge_dicts(
+            {"project": {"name": "Plugin", "version": incompatible_version}},
+            build_config(data),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        builder.build_standard(dist_dir)
+        with open(f"{dist_dir}/metadata.json") as f:
+            metadata_result = json.load(f)
+            self.assert_versions(
+                metadata_result, version="0.7", status="stable", kicad_version="6.0"
+            )
+        mock.assert_called_once_with(
+            f"Found KiCad incompatible version number: {incompatible_version}\n"
+            "Using simplified value: 0.7"
+        )
