@@ -291,7 +291,15 @@ class KicadBuilderConfig(BuilderConfig):
         The minimum required KiCad version for this package
         """
         if not self.__kicad_version:
-            self.__kicad_version = self.required_str("kicad_version")
+            kicad_version = self.required_str("kicad_version")
+            if not re.match(self._VERSION_REGEX, kicad_version):
+                msg = (
+                    f"Field `{self._BASE}.kicad_version` has "
+                    "invalid format, must match following regular "
+                    f"expression: `{self._VERSION_REGEX}`"
+                )
+                raise ValueError(msg)
+            self.__kicad_version = kicad_version
         return self.__kicad_version
 
     @property
@@ -302,6 +310,13 @@ class KicadBuilderConfig(BuilderConfig):
         if not self.__kicad_version_max:
             if "kicad_version_max" in self.target_config:
                 kicad_version_max = self.required_str("kicad_version_max")
+                if not re.match(self._VERSION_REGEX, kicad_version_max):
+                    msg = (
+                        f"Field `{self._BASE}.kicad_version_max` has "
+                        "invalid format, must match following regular "
+                        f"expression: `{self._VERSION_REGEX}`"
+                    )
+                    raise ValueError(msg)
             else:
                 kicad_version_max = ""
             self.__kicad_version_max = kicad_version_max

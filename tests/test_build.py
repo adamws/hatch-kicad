@@ -456,6 +456,25 @@ def test_kicad_version_max_wrong_type(isolation):
         _ = builder.config.kicad_version_max
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["kicad_version", "kicad_version_max"],
+)
+def test_version_wrong_format(name, isolation):
+    config = build_config({name: "6.0.0.1"})
+    builder = KicadBuilder(str(isolation), config=config)
+    regex_pattern = r"^\d{1,4}(\.\d{1,4}(\.\d{1,6})?)?$"
+    with pytest.raises(
+        ValueError,
+        match=re.escape(
+            f"Field `tool.hatch.build.targets.kicad-package.{name}` has "
+            "invalid format, must match following regular "
+            f"expression: `{regex_pattern}`"
+        ),
+    ):
+        _ = getattr(builder.config, name)
+
+
 def test_kicad_version_max_missing(isolation):
     builder = KicadBuilder(str(isolation), config={})
     assert builder.config.kicad_version_max == ""
