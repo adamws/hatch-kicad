@@ -674,7 +674,7 @@ class TestBuildStandard:
         expected = ["resources/icon.png", "metadata.json"]
         for s in sources:
             name = Path(s.name).name
-            expected.append(f"plugin/{name}")
+            expected.append(f"plugins/{name}")
         assert len(in_zip) == len(expected) and sorted(in_zip) == sorted(expected)
 
     def test_build_minimal_config(self, isolation, fake_project, dist_dir):
