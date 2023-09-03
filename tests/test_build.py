@@ -3,9 +3,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import tempfile
 import zipfile
 from pathlib import Path
+from types import MappingProxyType
+from unittest.mock import Mock
 
 import pytest
 from hatchling.builders.plugin.interface import BuilderInterface
@@ -564,58 +567,153 @@ def get_zip_contents(zip_path) -> list[str]:
     return content
 
 
-def test_build_standard(isolation):
-    dist_dir = f"{isolation}/dist"
+@pytest.fixture
+def fake_project(isolation):
     src_dir = f"{isolation}/src"
-    os.mkdir(dist_dir)
     os.mkdir(src_dir)
-    icon = tempfile.NamedTemporaryFile(dir=src_dir)
-    sources = [tempfile.NamedTemporaryFile(dir=src_dir, suffix=".py") for _ in range(5)]
-    data = {
-        "name": "Plugin Name",
-        "description": "Short Decription",
-        "description_full": ["Full multiline\n", "description"],
-        "identifier": "com.plugin.identifier",
-        "author": {"name": "bar", "email": "bar@domain"},
-        "license": "MIT",
-        "status": "stable",
-        "kicad_version": "6.0",
-        "icon": icon.name,
-        "sources": ["src"],
-        "include": ["src/*.py"],
-    }
-    config = merge_dicts(
-        {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
+    icon = tempfile.NamedTemporaryFile(dir=src_dir, delete=False)
+    sources = [
+        tempfile.NamedTemporaryFile(dir=src_dir, delete=False, suffix=".py")
+        for _ in range(5)
+    ]
+    yield icon, sources
+    shutil.rmtree(src_dir)
+
+
+@pytest.fixture
+def dist_dir(isolation):
+    dist_dir = f"{isolation}/dist"
+    os.mkdir(dist_dir)
+    yield dist_dir
+    shutil.rmtree(dist_dir)
+
+
+class TestBuildStandard:
+    _CONFIG_BASE = MappingProxyType(
+        {
+            "name": "Plugin Name",
+            "description": "Short Decription",
+            "description_full": ["Full multiline\n", "description"],
+            "identifier": "com.plugin.identifier",
+            "author": {"name": "bar", "email": "bar@domain"},
+            "license": "MIT",
+            "status": "stable",
+            "kicad_version": "6.0",
+        }
     )
-    builder = KicadBuilder(str(isolation), config=config)
-    builder.build_standard(dist_dir)
-    with open(f"{dist_dir}/metadata.json") as f:
-        metadata_result = json.load(f)
-        version = metadata_result["versions"][0]
-        assert "download_sha256" in version
-        assert "download_size" in version
-        assert "install_size" in version
-        del version["download_sha256"]
-        del version["download_size"]
-        del version["install_size"]
-        assert metadata_result == builder.config.get_metadata()
 
-    in_zip = get_zip_contents(f"{isolation}/dist/Plugin-0.0.1.zip")
-    expected = ["resources/icon.png", "metadata.json"]
-    for s in sources:
-        name = Path(s.name).name
-        expected.append(f"plugin/{name}")
-    assert len(in_zip) == len(expected) and sorted(in_zip) == sorted(expected)
+    def assert_versions(self, metadata: dict, **kwargs):
+        # metadata should have single version with `download_sha256`,
+        # `download_size` and `install_size` keys and non-empty
+        # values (calculating these values is tested separately by known zip file
+        # so it can be skipped here for fake-generated one)
+        assert "versions" in metadata
+        versions = metadata["versions"]
+        assert len(versions) == 1
+        for k in ["download_sha256", "download_size", "install_size"]:
+            assert k in versions[0]
+            assert versions[0][k]
+        for k, v in kwargs.items():
+            assert versions[0][k] == v
 
+    def filter_dict(self, data: dict, ignore: list[str]) -> dict:
+        return {k: v for k, v in data.items() if k not in ignore}
 
-def test_build_standard_wrong_config(monkeypatch, isolation):
-    def mock_abort(*args, **kwargs):
-        _ = args, kwargs
-        msg = "Abort called"
-        raise Exception(msg)
+    def assert_zip_content(self, zip_path: str, sources):
+        in_zip = get_zip_contents(zip_path)
+        expected = ["resources/icon.png", "metadata.json"]
+        for s in sources:
+            name = Path(s.name).name
+            expected.append(f"plugin/{name}")
+        assert len(in_zip) == len(expected) and sorted(in_zip) == sorted(expected)
 
-    monkeypatch.setattr("hatchling.bridge.app.Application.abort", mock_abort)
-    config = {"project": {"name": "Plugin", "version": "0.1.0"}}
-    builder = KicadBuilder(str(isolation), config=config)
-    with pytest.raises(Exception, match="Abort called"):
+    def test_build_minimal_config(self, isolation, fake_project, dist_dir):
+        icon, sources = fake_project
+        data = merge_dicts(
+            self._CONFIG_BASE,
+            {"icon": icon.name, "sources": ["src"], "include": ["src/*.py"]},
+        )
+        config = merge_dicts(
+            {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        builder.build_standard(dist_dir)
+        with open(f"{dist_dir}/metadata.json") as f:
+            metadata_result = json.load(f)
+            self.assert_versions(
+                metadata_result, version="0.0.1", status="stable", kicad_version="6.0"
+            )
+            # assert that produced json contains same data as internall config metadata
+            # (ignoring version which contains dynamic data sha and sizes)
+            assert self.filter_dict(metadata_result, ["versions"]) == self.filter_dict(
+                builder.config.get_metadata(), ["versions"]
+            )
+
+        self.assert_zip_content(f"{isolation}/dist/Plugin-0.0.1.zip", sources)
+
+    def test_build_failed_maintainer(
+        self, monkeypatch, isolation, fake_project, dist_dir
+    ):
+        abort_mock = Mock()
+        monkeypatch.setattr("hatchling.bridge.app.Application.abort", abort_mock)
+        display_error_mock = Mock()
+        monkeypatch.setattr(
+            "hatchling.bridge.app.Application.display_error", display_error_mock
+        )
+        icon, _ = fake_project
+        data = merge_dicts(
+            self._CONFIG_BASE,
+            # if illegal maintainer is explicitly declared in `kicad-pacakge` target,
+            # then raise an exception even though it is not required metadata field
+            {"icon": icon.name, "maintainer": {"name": 501 * "a"}},
+        )
+        config = merge_dicts(
+            {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        builder.build_standard(dist_dir)
+        expected_error = (
+            "Field `tool.hatch.build.targets.kicad-package.maintainer` `name` "
+            "property too long, can be 500 character long, got 501"
+        )
+        display_error_mock.assert_called_once_with(expected_error)
+        abort_mock.assert_called_once_with("Build failed!")
+
+    def test_build_ignores_failed_maintainer_fallback(
+        self, isolation, fake_project, dist_dir
+    ):
+        icon, sources = fake_project
+        data = merge_dicts(
+            self._CONFIG_BASE,
+            {"icon": icon.name, "sources": ["src"], "include": ["src/*.py"]},
+        )
+        config = merge_dicts(
+            {
+                "project": {
+                    "name": "Plugin",
+                    "version": "0.0.1",
+                    # this maintainer has illegal name but we should ignore it
+                    # since maintainer is not required metadata field
+                    # and it just an optional fallback (maintainer not defined
+                    # by `kicad-package` target)
+                    "maintainers": [{"name": 501 * "a"}],
+                }
+            },
+            build_config(data),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        builder.build_standard(dist_dir)
+        with open(f"{dist_dir}/metadata.json") as f:
+            metadata_result = json.load(f)
+            assert "maintainer" not in metadata_result
+            assert self.filter_dict(metadata_result, ["versions"]) == self.filter_dict(
+                builder.config.get_metadata(), ["versions"]
+            )
+
+    def test_build_standard_wrong_config(self, monkeypatch, isolation):
+        mock = Mock()
+        monkeypatch.setattr("hatchling.bridge.app.Application.abort", mock)
+        config = {"project": {"name": "Plugin", "version": "0.1.0"}}
+        builder = KicadBuilder(str(isolation), config=config)
         builder.build_standard(str(isolation))
+        mock.assert_called_once_with("Build failed!")
