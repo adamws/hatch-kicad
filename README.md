@@ -16,6 +16,7 @@
 - [Builder](#builder)
   - [Options](#options)
   - [How to run](#how-to-run)
+  - [Showcases](#showcases)
 - [License](#license)
 
 ## Global dependency
@@ -119,6 +120,10 @@ For details how to use these files to submit package to KiCad addon repository s
 > [!WARNING]
 > Package `download_url` is not set in produced `metadata.json` file.
 > It needs to be manually updated before submitting to KiCad's PCM
+
+### Showcases
+
+- [*kicad-kbplacer*](https://github.com/adamws/kicad-kbplacer) ([`pyproject.toml`](https://github.com/adamws/kicad-kbplacer/blob/master/pyproject.toml))
 
 ## License
 
