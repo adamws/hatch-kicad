@@ -604,11 +604,11 @@ def test_package_metadata_calculation(request):
     assert metadata["install_size"] == 10
 
 
-def get_zip_contents(zip_path) -> list[str]:
+def get_zip_info(zip_path) -> list[zipfile.ZipInfo]:
     content = []
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        for file_name in zip_ref.namelist():
-            content.append(file_name)
+        for info in zip_ref.infolist():
+            content.append(info)
     return content
 
 
@@ -669,19 +669,42 @@ class TestBuildStandard:
     def filter_dict(self, data: dict, ignore: list[str]) -> dict:
         return {k: v for k, v in data.items() if k not in ignore}
 
-    def assert_zip_content(self, zip_path: str, sources):
-        in_zip = get_zip_contents(zip_path)
+    def assert_zip_content(self, zip_path: str, sources, *, reproducible: bool = True):
+        zip_info = get_zip_info(zip_path)
+        zip_files = [z.filename for z in zip_info]
         expected = ["resources/icon.png", "metadata.json"]
         for s in sources:
             name = Path(s.name).name
             expected.append(f"plugins/{name}")
-        assert len(in_zip) == len(expected) and sorted(in_zip) == sorted(expected)
+        assert len(zip_info) == len(expected) and sorted(zip_files) == sorted(expected)
+        if reproducible:
+            for info in zip_info:
+                assert info.date_time == (2020, 2, 2, 0, 0, 0)
+        else:
+            # non reproducible bulids should use actual file timestamps,
+            # because test files are created at runtime, it should be sufficient
+            # to check if year is >= 2023. This is check is required
+            # to catch possible bug where `reproducible` is always on
+            for info in zip_info:
+                assert info.date_time[0] >= 2023
 
-    def test_build_minimal_config(self, isolation, fake_project, dist_dir):
+    @pytest.mark.parametrize(
+        "reproducible",
+        [True, False],
+        ids=lambda val: "reproducible" if val else "non-reproducible",
+    )
+    def test_build_minimal_config(
+        self, reproducible, isolation, fake_project, dist_dir
+    ):
         icon, sources = fake_project
         data = merge_dicts(
             self._CONFIG_BASE,
-            {"icon": icon.name, "sources": ["src"], "include": ["src/*.py"]},
+            {
+                "icon": icon.name,
+                "sources": ["src"],
+                "include": ["src/*.py"],
+                "reproducible": reproducible,
+            },
         )
         config = merge_dicts(
             {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
@@ -699,7 +722,9 @@ class TestBuildStandard:
                 builder.config.get_metadata(), ["versions"]
             )
 
-        self.assert_zip_content(f"{isolation}/dist/Plugin-0.0.1.zip", sources)
+        self.assert_zip_content(
+            f"{isolation}/dist/Plugin-0.0.1.zip", sources, reproducible=reproducible
+        )
 
     def test_build_failed_maintainer(
         self, monkeypatch, isolation, fake_project, dist_dir

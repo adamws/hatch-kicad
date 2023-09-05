@@ -6,16 +6,20 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 import zipfile
 from pathlib import Path
-from typing import Any, Callable, TypedDict
+from types import TracebackType
+from typing import Any, Callable, Tuple, TypedDict
 
 from hatchling.builders.plugin.interface import BuilderInterface
+from hatchling.builders.utils import get_reproducible_timestamp
 
 from hatch_kicad.config import KicadBuilderConfig
 
 __all__ = ["KicadBuilder"]
 
+ZipTime = Tuple[int, int, int, int, int, int]
 READ_SIZE = 65536
 
 
@@ -23,6 +27,37 @@ class PackageMetadata(TypedDict):
     download_sha256: str
     download_size: int
     install_size: int
+
+
+class ZipArchive:
+    def __init__(self, file: Path, *, reproducible: bool) -> None:
+        self.name = file
+        self.reproducible = reproducible
+        self.timestamp: int | None = (
+            get_reproducible_timestamp() if reproducible else None
+        )
+        self.ziptime: ZipTime | None = (
+            time.gmtime(self.timestamp)[0:6] if self.timestamp else None
+        )
+        self.zip = zipfile.ZipFile(file, "w", compression=zipfile.ZIP_DEFLATED)
+
+    def write(self, filename: str | os.PathLike, arcname: str | os.PathLike) -> None:
+        info = zipfile.ZipInfo.from_file(filename, arcname)
+        if self.ziptime:
+            info.date_time = self.ziptime
+        with open(filename, "rb") as f:
+            self.zip.writestr(info, f.read())
+
+    def __enter__(self) -> ZipArchive:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.zip.close()
 
 
 def getsha256(filename) -> str:
@@ -71,7 +106,7 @@ class KicadBuilder(BuilderInterface):
             with open(metadata_target, "w") as f:
                 json.dump(metadata, f, indent=4)
 
-            with zipfile.ZipFile(zip_target, "w", zipfile.ZIP_DEFLATED) as zipf:
+            with ZipArchive(zip_target, reproducible=self.config.reproducible) as zipf:
                 for file in self.recurse_included_files():
                     zipf.write(file.path, f"plugins/{file.distribution_path}")
                 zipf.write(self.config.icon, "resources/icon.png")
