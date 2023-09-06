@@ -123,7 +123,8 @@ For details how to use these files to submit package to KiCad addon repository s
 
 ### Showcases
 
-- [*kicad-kbplacer*](https://github.com/adamws/kicad-kbplacer) ([`pyproject.toml`](https://github.com/adamws/kicad-kbplacer/blob/master/pyproject.toml))
+- [*kicad-plugin-template*](https://github.com/adamws/kicad-plugin-template) ([`pyproject.toml`](https://github.com/adamws/kicad-plugin-template/blob/master/pyproject.toml)) Minimal example
+- [*kicad-kbplacer*](https://github.com/adamws/kicad-kbplacer) ([`pyproject.toml`](https://github.com/adamws/kicad-kbplacer/blob/master/pyproject.toml)) Advanced usage with extra build hooks and dynamic versioning
 
 ## License
 
