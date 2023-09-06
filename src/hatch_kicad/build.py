@@ -106,11 +106,21 @@ class KicadBuilder(BuilderInterface):
             with open(metadata_target, "w") as f:
                 json.dump(metadata, f, indent=4)
 
+            found_plugin_files = False
             with ZipArchive(zip_target, reproducible=self.config.reproducible) as zipf:
                 for file in self.recurse_included_files():
+                    # require at least one *.py file, otherwise assume that
+                    # user made an mistake in configuration
+                    if not found_plugin_files and file.relative_path.endswith(".py"):
+                        found_plugin_files = True
                     zipf.write(file.path, f"plugins/{file.distribution_path}")
                 zipf.write(self.config.icon, "resources/icon.png")
                 zipf.write(metadata_target, "metadata.json")
+
+            if not found_plugin_files:
+                self.app.display_error(
+                    "No plugin files found, please check your configuration"
+                )
 
             calculated_meta = get_package_metadata(zip_target)
             self.app.display_info("package details:")

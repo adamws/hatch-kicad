@@ -819,3 +819,23 @@ class TestBuildStandard:
             f"Found KiCad incompatible version number: {incompatible_version}\n"
             "Using simplified value: 0.7"
         )
+
+    def test_warn_missing_files(self, monkeypatch, isolation, fake_project, dist_dir):
+        mock = Mock()
+        monkeypatch.setattr("hatchling.bridge.app.Application.display_error", mock)
+        icon, _ = fake_project
+        data = merge_dicts(
+            self._CONFIG_BASE,
+            {
+                "icon": icon.name,
+                "include": ["src/*.txt"],
+            },
+        )
+        config = merge_dicts(
+            {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        builder.build_standard(dist_dir)
+        mock.assert_called_once_with(
+            "No plugin files found, please check your configuration"
+        )
