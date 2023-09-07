@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from hatchling.builders.config import BuilderConfig
+from hatchling.utils.context import Context
 from packaging.version import parse
 
 from hatch_kicad.licenses.supported import LICENSES
@@ -28,6 +29,7 @@ class KicadBuilderConfig(BuilderConfig):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
+        self.__context: Context | None = None
         self.__name: str | None = None
         self.__description: str | None = None
         self.__description_full: str | None = None
@@ -42,6 +44,12 @@ class KicadBuilderConfig(BuilderConfig):
         self.__tags: list[str] | None = None
         self.__icon: Path | None = None
         self.__version: str | None = None
+
+    @property
+    def context(self) -> Context:
+        if self.__context is None:
+            self.__context = Context(self.root)
+        return self.__context
 
     def required_str(self, name: str, max_length: int = -1) -> str:
         if name in self.target_config:
@@ -274,7 +282,7 @@ class KicadBuilderConfig(BuilderConfig):
         deprecated: This package is no longer maintained.
         """
         if not self.__status:
-            status = self.required_str("status")
+            status = self.context.format(self.required_str("status"))
             if status not in ["stable", "testing", "development", "deprecated"]:
                 msg = (
                     f"Invalid `{self._BASE}.status` value.\n"

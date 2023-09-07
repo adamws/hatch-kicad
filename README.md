@@ -15,6 +15,7 @@
 - [Global dependency](#global-dependency)
 - [Builder](#builder)
   - [Options](#options)
+    - [Environment variables substitution](#environment-variables-substitution)
   - [How to run](#how-to-run)
   - [Showcases](#showcases)
 - [License](#license)
@@ -83,7 +84,7 @@ Archive root
 | `maintainer`        | same as `author`                                            | first `maintainer` from `project.maintainers` or `None` if does not contain `name` property                                                                                                                                                                                                                          | Same as `author` but not mandatory. If `project.maintainers` fallback fails (due to missing `name` for example), `maintainer` will be not included in final `metadata.json`                                                                                                                                                                    |
 | `license`           | `str`                                                       | `license` from `project` metadata if it has [`text`](https://packaging.python.org/en/latest/specifications/declaring-project-metadata/#license) key (for example `license = {text = "MIT"}`).<br/>License with `file` key **not supported**.<br/>This option is **required** so plugin will fail if default missing. | A string containing the license under which the package is distributed. KiCad team requires opens-source license in order to be included in official KiCad's package repository. List of the supported licenses can be found [here](https://github.com/adamws/hatch-kicad/blob/master/src/hatch_kicad/licenses/supported.py).                  |
 | `resources`         | `dict`                                                      | `project.urls` or `{}` if missing                                                                                                                                                                                                                                                                                    | Additional resource links for the package. Place your website, github, documentation and other links here.                                                                                                                                                                                                                                     |
-| `status`            | `str`                                                       | **required**                                                                                                                                                                                                                                                                                                         | A string containing one of the following: `stable` - this package is stable for general use, `testing` - this package is in a testing phase, users should be cautious and report issues, `development` - this package is in a development phase and should not be expected to work fully, `deprecated` - this package is no longer maintained. |
+| `status`            | `str` (supports [environment variables substitution](#environment-variables-substitution))                                                      | **required**                                                                                                                                                                                                                    | A string containing one of the following: `stable` - this package is stable for general use, `testing` - this package is in a testing phase, users should be cautious and report issues, `development` - this package is in a development phase and should not be expected to work fully, `deprecated` - this package is no longer maintained. |
 | `kicad_version`     | `str`                                                       | **required**                                                                                                                                                                                                                                                                                                         | The minimum required KiCad version for this package.                                                                                                                                                                                                                                                                                           |
 | `kicad_version_max` | `str`                                                       | `""`                                                                                                                                                                                                                                                                                                                 | The last KiCad version this package is compatible with.                                                                                                                                                                                                                                                                                        |
 | `tags`              | `list` of `str`                                             | `[]`                                                                                                                                                                                                                                                                                                                 | The list of tags                                                                                                                                                                                                                                                                                                                               |
@@ -96,6 +97,20 @@ For more details see [kicad documentation](https://dev-docs.kicad.org/en/addons/
 > KiCad version requirement is not compatible with [PEP-0440](https://peps.python.org/pep-0440/) so some
 > valid python values won't pass PCM validation check. In such cases
 > `kicad-package` plugin uses only [`base version`](https://packaging.pypa.io/en/stable/version.html#packaging.version.Version.base_version) value.
+
+#### Environment variables substitution
+
+Value of `status` option can be set with [environment variables substitution](https://hatch.pypa.io/latest/config/context/#environment-variables)
+using `env` field and its modifier, e.g. `{env:ENV_NAME:DEFAULT}`, for example:
+
+```toml
+[tool.hatch.build.kicad-package]
+status = "{env:MY_PLUGIN_STATUS:development}"
+```
+
+> [!IMPORTANT]
+> Default value (used when environment variable not set) **must** be one of the following: `stable`, `testing`, `development` or `deprecated`
+
 
 ### How to run
 

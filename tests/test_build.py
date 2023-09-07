@@ -439,6 +439,23 @@ def test_status_wrong_value(isolation):
         _ = builder.config.status
 
 
+def test_status_env_substitution(isolation, monkeypatch):
+    monkeypatch.setenv("HATCH_KICAD_STATUS", "stable")
+    builder = KicadBuilder(
+        str(isolation),
+        config=build_config({"status": "{env:HATCH_KICAD_STATUS:development}"}),
+    )
+    assert builder.config.status == "stable"
+
+
+def test_status_env_substitution_default(isolation):
+    builder = KicadBuilder(
+        str(isolation),
+        config=build_config({"status": "{env:HATCH_KICAD_STATUS:development}"}),
+    )
+    assert builder.config.status == "development"
+
+
 def test_kicad_version_max(isolation):
     config = build_config({"kicad_version_max": "6.0"})
     builder = KicadBuilder(str(isolation), config=config)
