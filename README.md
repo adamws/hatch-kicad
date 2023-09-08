@@ -16,6 +16,7 @@
 - [Builder](#builder)
   - [Options](#options)
     - [Environment variables substitution](#environment-variables-substitution)
+    - [Context formatting](#context-formatting)
   - [How to run](#how-to-run)
   - [Showcases](#showcases)
 - [License](#license)
@@ -89,6 +90,7 @@ Archive root
 | `kicad_version_max` | `str`                                                       | `""`                                                                                                                                                                                                                                                                                                                 | The last KiCad version this package is compatible with.                                                                                                                                                                                                                                                                                        |
 | `tags`              | `list` of `str`                                             | `[]`                                                                                                                                                                                                                                                                                                                 | The list of tags                                                                                                                                                                                                                                                                                                                               |
 | `icon`              | `str`                                                       | **required**                                                                                                                                                                                                                                                                                                         | The path to the 64x64-pixel icon that will de displayed alongside the package in the KiCad's package dialog. Icon file **must** exist.                                                                                                                                                                                                         |
+| `download_url`      | `str` (supports [context formatting](#context-formatting))  | `""`                                                                                                                                                                                                                                                                                                                 | A string containing a direct download URL for the package archive.                                                                                                                                                                                                                                                                             |
 
 For more details see [kicad documentation](https://dev-docs.kicad.org/en/addons/).
 
@@ -111,12 +113,64 @@ status = "{env:MY_PLUGIN_STATUS:development}"
 > [!IMPORTANT]
 > Default value (used when environment variable not set) **must** be one of the following: `stable`, `testing`, `development` or `deprecated`
 
+#### Context formatting
+
+Value of `download_url`, similarly to `status`, can be set dynamically by environment variables substitution,
+but additionally supports three **optional** format fields.
+
+| Field      | Description                                                                                                       |
+| ---        | ---                                                                                                               |
+| `status`   | The value of `tool.hatch.build.kicad-package.status` after substitution (if any)                                  |
+| `version`  | The value of `project.version`, may be dynamic, for example using [hatch-vcs](https://github.com/ofek/hatch-vcs)  |
+| `zip_name` | The name of built zip artifact                                                                                    |
+
+For example:
+
+```toml
+[project]
+name = "my-plugin"
+version = "0.1.0"
+
+[tool.hatch.build.kicad-package]
+status = "{env:MY_PLUGIN_STATUS:development}"
+download_url = "https://{env:MY_PLUGIN_URL:foo.bar}/{status}/{version}/{zip_name}"
+# ...remaining required options
+```
+
+Value of `download_url` will depend on both `MY_PLUGIN_STATUS` and `MY_PLUGIN_URL` **optional** environment variables
+and will be expanded to following strings:
+
+| `MY_PLUGIN_URL` | `MY_PLUGIN_STATUS` | `download_url` after substitution                         |
+| ---             | ---                | ---                                                       |
+| `"baz.bar"`     | _not set_          | `"https://baz.bar/development/0.1.0/my_plugin-0.1.0.zip"` |
+| _not set_       | `"stable"`         | `"https://foo.bar/stable/0.1.0/my_plugin-0.1.0.zip"`      |
+
+> [!NOTE]
+> Package `download_url` is optional and will be empty in `metadata.json` file if not configured.
+> In such case, remember to manually update it before submitting plugin to KiCad's plugin repository.
+
+> [!WARNING]
+> The file name of zip artifact is by default formatted in '[PEP 625](https://peps.python.org/pep-0625/) like' form of `{name}-{version}.zip`
+> where `{name}` is [normalised](https://packaging.python.org/en/latest/specifications/source-distribution-format/#source-distribution-file-name).
+> This may lead to some unexpected results in `download_url` value. In the above example `plugin-name` has been normalised to `plugin_name`.
+> If default behaviour is not desired, avoid usage of `zip_name` format field.
+
+Environment variable and its default fallback value **can** include format fields:
+
+```toml
+[tool.hatch.build.kicad-package]
+status = "stable"
+# when MY_PLUGIN_URL="https://custom/{status}/plugin.zip" environment variable set,
+# then download_url results in "https://custom/stable/plugin.zip"
+download_url = "{env:MY_PLUGIN_URL:https://default/{zip_name}}"
+# ...remaining required options
+```
 
 ### How to run
 
 To start build process, run `hatch build -t kicad-package`. If build successful, calculated `download_sha256`, `download_size` and `install_size` fields should be printed:
 
-``` shell
+```shell
 $ hatch build --target kicad-package
 [kicad-package]
 Running custom, version: standard
@@ -129,12 +183,9 @@ package details:
 dist/plugin-0.7.zip
 ```
 
-By default, output artifacts are located at `dist` directory. There should be two files: `<package>.zip` and `metadata.json`.
+By default, output artifacts are located at `dist` directory.<br>
+There should be two files: `{name}-{version}.zip` and `metadata.json`.
 For details how to use these files to submit package to KiCad addon repository see [this guide](https://dev-docs.kicad.org/en/addons/).
-
-> [!WARNING]
-> Package `download_url` is not set in produced `metadata.json` file.
-> It needs to be manually updated before submitting to KiCad's PCM
 
 ### Showcases
 

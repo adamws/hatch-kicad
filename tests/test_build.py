@@ -581,6 +581,75 @@ def test_version_unrecoverable_illegal_format(isolation):
         _ = builder.config.version
 
 
+def test_download_url(isolation):
+    url = "https://example.com/dist/package.zip"
+    config = build_config({"download_url": url})
+    builder = KicadBuilder(str(isolation), config=config)
+    assert builder.config.download_url == url
+
+
+def test_download_url_wrong_type(isolation):
+    config = build_config({"download_url": True})
+    builder = KicadBuilder(str(isolation), config=config)
+    with pytest.raises(
+        TypeError,
+        match="Field `tool.hatch.build.targets.kicad-package.download_url` "
+        "must be a string",
+    ):
+        _ = builder.config.download_url
+
+
+def test_download_url_missing(isolation):
+    builder = KicadBuilder(str(isolation), config={})
+    assert builder.config.download_url == ""
+
+
+@pytest.mark.parametrize(
+    "envs,download_url,expected_url",
+    [
+        (
+            {"PLUGIN_DIR": "baz", "STATUS": "stable"},
+            "test/{env:PLUGIN_DIR:bar}/{status}/v{version}/{zip_name}",
+            "test/baz/stable/v0.0.1/plugin-0.0.1.zip",
+        ),
+        (
+            {},
+            "test/{env:PLUGIN_DIR:bar}/{status}/v{version}/{zip_name}",
+            "test/bar/development/v0.0.1/plugin-0.0.1.zip",
+        ),
+        (
+            {"PLUGIN_URL": "test/{status}/plugin.zip"},
+            "{env:PLUGIN_URL:test/default/{zip_name}}",
+            "test/development/plugin.zip",
+        ),
+        (
+            {"PLUGIN_URL": "test/{status}/plugin.zip", "STATUS": "stable"},
+            "{env:PLUGIN_URL:test/default/{zip_name}}",
+            "test/stable/plugin.zip",
+        ),
+        (
+            {},
+            "{env:PLUGIN_URL:test/default/{zip_name}}",
+            "test/default/plugin-0.0.1.zip",
+        ),
+    ],
+)
+def test_download_url_substitution(
+    isolation, monkeypatch, envs, download_url, expected_url
+):
+    for k, v in envs.items():
+        monkeypatch.setenv(k, v)
+    data = {
+        "status": "{env:STATUS:development}",
+        "download_url": download_url,
+    }
+    config = merge_dicts(
+        {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
+    )
+    builder = KicadBuilder(str(isolation), config=config)
+    assert builder.config.get_download_url("plugin-0.0.1.zip") == expected_url
+
+
 def test_get_metadata(isolation):
     data = {
         "name": "Plugin Name",

@@ -44,6 +44,7 @@ class KicadBuilderConfig(BuilderConfig):
         self.__tags: list[str] | None = None
         self.__icon: Path | None = None
         self.__version: str | None = None
+        self.__download_url: str | None = None
 
     @property
     def context(self) -> Context:
@@ -375,6 +376,34 @@ class KicadBuilderConfig(BuilderConfig):
                 version = str(parse(version).base_version)
             self.__version = version
         return self.__version
+
+    @property
+    def download_url(self) -> str:
+        if not self.__download_url:
+            if "download_url" in self.target_config:
+                url = self.target_config["download_url"]
+                if not isinstance(url, str):
+                    msg = f"Field `{self._BASE}.download_url` must be a string"
+                    raise TypeError(msg)
+            else:
+                url = ""
+            self.__download_url = url
+        return self.__download_url
+
+    def get_download_url(self, zip_name: str) -> str:
+        def _format(value: str) -> str:
+            return self.context.format(
+                value,
+                version=self.version,
+                status=self.status,
+                zip_name=zip_name,
+            )
+
+        # run two passes of `_format` in case environment variable value
+        # uses supported fields, for example:
+        # ENV = "http://foo.bar/{status}/plugin.zip"
+        # download_url = "{env:ENV:http://bar.baz/development/{zip_name}}"
+        return _format(_format(self.download_url))
 
     def get_metadata(self) -> dict[str, Any]:
         metadata: dict[str, Any] = {

@@ -128,7 +128,9 @@ class KicadBuilder(BuilderInterface):
 
             package_version = metadata["versions"][0]
             package_version.update(calculated_meta)
-            package_version.update({"download_url": ""})
+            package_version.update(
+                {"download_url": self.config.get_download_url(zip_name)}
+            )
             # update with calculated metadata
             with open(metadata_target, "w") as f:
                 json.dump(metadata, f, indent=4)
