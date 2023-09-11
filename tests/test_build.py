@@ -1,11 +1,11 @@
+# SPDX-FileCopyrightText: 2023-present adamws <adamws@users.noreply.github.com>
+#
+# SPDX-License-Identifier: MIT
 from __future__ import annotations
 
 import json
-import os
 import re
-import shutil
 import tempfile
-import zipfile
 from pathlib import Path
 from types import MappingProxyType
 from unittest.mock import Mock
@@ -15,23 +15,7 @@ from hatchling.builders.plugin.interface import BuilderInterface
 
 from hatch_kicad.build import KicadBuilder, get_package_metadata
 
-
-def merge_dicts(x, y):
-    z = x.copy()
-    z.update(y)
-    return z
-
-
-def build_config(values):
-    return {
-        "tool": {
-            "hatch": {
-                "build": {
-                    "targets": {"kicad-package": values},
-                },
-            },
-        },
-    }
+from .utils import assert_zip_content, build_config, merge_dicts
 
 
 def test_class() -> None:
@@ -693,35 +677,6 @@ def test_package_metadata_calculation(request):
     assert metadata["install_size"] == 10
 
 
-def get_zip_info(zip_path) -> list[zipfile.ZipInfo]:
-    content = []
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        for info in zip_ref.infolist():
-            content.append(info)
-    return content
-
-
-@pytest.fixture
-def fake_project(isolation):
-    src_dir = f"{isolation}/src"
-    os.mkdir(src_dir)
-    icon = tempfile.NamedTemporaryFile(dir=src_dir, delete=False)
-    sources = [
-        tempfile.NamedTemporaryFile(dir=src_dir, delete=False, suffix=".py")
-        for _ in range(5)
-    ]
-    yield icon, sources
-    shutil.rmtree(src_dir)
-
-
-@pytest.fixture
-def dist_dir(isolation):
-    dist_dir = f"{isolation}/dist"
-    os.mkdir(dist_dir)
-    yield dist_dir
-    shutil.rmtree(dist_dir)
-
-
 class TestBuildStandard:
     _CONFIG_BASE = MappingProxyType(
         {
@@ -758,25 +713,6 @@ class TestBuildStandard:
     def filter_dict(self, data: dict, ignore: list[str]) -> dict:
         return {k: v for k, v in data.items() if k not in ignore}
 
-    def assert_zip_content(self, zip_path: str, sources, *, reproducible: bool = True):
-        zip_info = get_zip_info(zip_path)
-        zip_files = [z.filename for z in zip_info]
-        expected = ["resources/icon.png", "metadata.json"]
-        for s in sources:
-            name = Path(s.name).name
-            expected.append(f"plugins/{name}")
-        assert len(zip_info) == len(expected) and sorted(zip_files) == sorted(expected)
-        if reproducible:
-            for info in zip_info:
-                assert info.date_time == (2020, 2, 2, 0, 0, 0)
-        else:
-            # non reproducible bulids should use actual file timestamps,
-            # because test files are created at runtime, it should be sufficient
-            # to check if year is >= 2023. This is check is required
-            # to catch possible bug where `reproducible` is always on
-            for info in zip_info:
-                assert info.date_time[0] >= 2023
-
     @pytest.mark.parametrize(
         "reproducible",
         [True, False],
@@ -811,8 +747,12 @@ class TestBuildStandard:
                 builder.config.get_metadata(), ["versions"]
             )
 
-        self.assert_zip_content(
-            f"{isolation}/dist/Plugin-0.0.1.zip", sources, reproducible=reproducible
+        expected = ["resources/icon.png", "metadata.json"]
+        for s in sources:
+            name = Path(s.name).name
+            expected.append(f"plugins/{name}")
+        assert_zip_content(
+            f"{isolation}/dist/Plugin-0.0.1.zip", expected, reproducible=reproducible
         )
 
     def test_build_failed_maintainer(
