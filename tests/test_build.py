@@ -583,7 +583,10 @@ def test_version_unrecoverable_illegal_format(isolation):
 
 def test_download_url(isolation):
     url = "https://example.com/dist/package.zip"
-    config = build_config({"download_url": url})
+    config = merge_dicts(
+        {"project": {"name": "plugin", "version": "0.0.1"}},
+        build_config({"download_url": url, "status": "stable"}),
+    )
     builder = KicadBuilder(str(isolation), config=config)
     assert builder.config.download_url == url
 
@@ -644,10 +647,10 @@ def test_download_url_substitution(
         "download_url": download_url,
     }
     config = merge_dicts(
-        {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
+        {"project": {"name": "plugin", "version": "0.0.1"}}, build_config(data)
     )
     builder = KicadBuilder(str(isolation), config=config)
-    assert builder.config.get_download_url("plugin-0.0.1.zip") == expected_url
+    assert builder.config.download_url == expected_url
 
 
 def test_get_metadata(isolation):

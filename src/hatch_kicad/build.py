@@ -89,9 +89,7 @@ class KicadBuilder(BuilderInterface):
         return {"standard": self.build_standard}
 
     def build_standard(self, directory: str, **build_data: Any) -> str:
-        project_name = self.normalize_file_name_component(self.metadata.core.raw_name)
-        zip_name = f"{project_name}-{self.metadata.version}.zip"
-        zip_target = Path(directory, zip_name)
+        zip_target = Path(directory, self.config.zip_name)
         metadata_target = Path(directory, "metadata.json")
 
         # log version 'fix' occurance
@@ -128,9 +126,7 @@ class KicadBuilder(BuilderInterface):
 
             package_version = metadata["versions"][0]
             package_version.update(calculated_meta)
-            package_version.update(
-                {"download_url": self.config.get_download_url(zip_name)}
-            )
+            package_version.update({"download_url": self.config.download_url})
             # update with calculated metadata
             with open(metadata_target, "w") as f:
                 json.dump(metadata, f, indent=4)

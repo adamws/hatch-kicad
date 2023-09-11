@@ -30,6 +30,7 @@ class KicadBuilderConfig(BuilderConfig):
         super().__init__(*args, **kwargs)
 
         self.__context: Context | None = None
+        self.__zip_name: str | None = None
         self.__name: str | None = None
         self.__description: str | None = None
         self.__description_full: str | None = None
@@ -51,6 +52,15 @@ class KicadBuilderConfig(BuilderConfig):
         if self.__context is None:
             self.__context = Context(self.root)
         return self.__context
+
+    @property
+    def zip_name(self) -> str:
+        if self.__zip_name is None:
+            project_name = self.builder.normalize_file_name_component(
+                self.builder.metadata.core.raw_name
+            )
+            self.__zip_name = f"{project_name}-{self.builder.metadata.version}.zip"
+        return self.__zip_name
 
     def required_str(self, name: str, max_length: int = -1) -> str:
         if name in self.target_config:
@@ -385,25 +395,24 @@ class KicadBuilderConfig(BuilderConfig):
                 if not isinstance(url, str):
                     msg = f"Field `{self._BASE}.download_url` must be a string"
                     raise TypeError(msg)
+
+                def _format(value: str) -> str:
+                    return self.context.format(
+                        value,
+                        version=self.version,
+                        status=self.status,
+                        zip_name=self.zip_name,
+                    )
+
+                # run two passes of `_format` in case environment variable value
+                # uses supported fields, for example:
+                # ENV = "http://foo.bar/{status}/plugin.zip"
+                # download_url = "{env:ENV:http://bar.baz/development/{zip_name}}"
+                url = _format(_format(url))
             else:
                 url = ""
             self.__download_url = url
         return self.__download_url
-
-    def get_download_url(self, zip_name: str) -> str:
-        def _format(value: str) -> str:
-            return self.context.format(
-                value,
-                version=self.version,
-                status=self.status,
-                zip_name=zip_name,
-            )
-
-        # run two passes of `_format` in case environment variable value
-        # uses supported fields, for example:
-        # ENV = "http://foo.bar/{status}/plugin.zip"
-        # download_url = "{env:ENV:http://bar.baz/development/{zip_name}}"
-        return _format(_format(self.download_url))
 
     def get_metadata(self) -> dict[str, Any]:
         metadata: dict[str, Any] = {
