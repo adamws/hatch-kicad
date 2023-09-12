@@ -13,6 +13,7 @@
 **Table of Contents**
 
 - [Global dependency](#global-dependency)
+- [Showcases](#showcases)
 - [Builder](#builder)
   - [Options](#options)
     - [Environment variables substitution](#environment-variables-substitution)
@@ -21,7 +22,6 @@
 - [Custom repository build hook](#custom-repository-build-hook)
   - [Options](#options-1)
     - [Context formatting](#context-formatting-1)
-- [Showcases](#showcases)
 - [License](#license)
 
 <!-- TOC --><a name="global-dependency"></a>
@@ -34,6 +34,12 @@ Add `hatch-kicad` within the `build-system.requires` field in your `pyproject.to
 requires = ["hatchling", "hatch-kicad"]
 build-backend = "hatchling.build"
 ```
+
+<!-- TOC --><a name="showcases"></a>
+## Showcases
+
+- [*kicad-plugin-template*](https://github.com/adamws/kicad-plugin-template) ([`pyproject.toml`](https://github.com/adamws/kicad-plugin-template/blob/master/pyproject.toml)) Minimal example
+- [*kicad-kbplacer*](https://github.com/adamws/kicad-kbplacer) ([`pyproject.toml`](https://github.com/adamws/kicad-kbplacer/blob/master/pyproject.toml)) Advanced usage with extra build hooks and dynamic versioning
 
 <!-- TOC --><a name="builder"></a>
 ## Builder
@@ -260,12 +266,6 @@ For example:
   </body>
 </html>
 ```
-
-<!-- TOC --><a name="showcases"></a>
-## Showcases
-
-- [*kicad-plugin-template*](https://github.com/adamws/kicad-plugin-template) ([`pyproject.toml`](https://github.com/adamws/kicad-plugin-template/blob/master/pyproject.toml)) Minimal example
-- [*kicad-kbplacer*](https://github.com/adamws/kicad-kbplacer) ([`pyproject.toml`](https://github.com/adamws/kicad-kbplacer/blob/master/pyproject.toml)) Advanced usage with extra build hooks and dynamic versioning
 
 <!-- TOC --><a name="license"></a>
 ## License
