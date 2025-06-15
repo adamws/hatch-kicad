@@ -11,7 +11,7 @@ from typing import Any, Callable, TypedDict
 
 from hatchling.builders.plugin.interface import BuilderInterface
 
-from hatch_kicad.config import KicadBuilderConfig
+from hatch_kicad.config import Compatibility, KicadBuilderConfig
 from hatch_kicad.utils import getsha256
 from hatch_kicad.zip import ZipArchive
 
@@ -45,6 +45,11 @@ class KicadBuilder(BuilderInterface):
         return {"standard": self.build_standard}
 
     def build_standard(self, directory: str, **build_data: Any) -> str:
+        if self.config.compatibility != Compatibility.LEGACY:
+            # currently only LEGACY fully supported, IPC under development
+            self.app.abort("Unsupported compatibility mode")
+            return ""
+
         zip_target = Path(directory, self.config.zip_name)
         metadata_target = Path(directory, "metadata.json")
 

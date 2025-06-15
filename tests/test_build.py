@@ -292,6 +292,37 @@ class TestContactOptions:
             assert getattr(builder.config, person) is None
 
 
+def test_default_compatibility(isolation):
+    config = {}
+    builder = KicadBuilder(str(isolation), config=config)
+    assert str(builder.config.compatibility) == "legacy"
+
+
+def test_unrecognized_compatibility(isolation):
+    config = merge_dicts(
+        {},
+        build_config({"compatibility": "unrecognized"}),
+    )
+    builder = KicadBuilder(str(isolation), config=config)
+    with pytest.raises(
+        ValueError,
+        match="Invalid compatibility value: `unrecognized`\n"
+        "Compatibility can be one of the following values: "
+        "legacy, ipc",
+    ):
+        _ = builder.config.compatibility
+
+
+@pytest.mark.parametrize("name", ["legacy", "ipc"])
+def test_compatibility(name, isolation):
+    config = merge_dicts(
+        {},
+        build_config({"compatibility": name}),
+    )
+    builder = KicadBuilder(str(isolation), config=config)
+    assert str(builder.config.compatibility) == name
+
+
 def test_license(isolation):
     config = merge_dicts(
         {"project": {"name": "Plugin", "license": "gpl-3.0"}},
@@ -677,7 +708,7 @@ def test_package_metadata_calculation(request):
     assert metadata["install_size"] == 10
 
 
-class TestBuildStandard:
+class TestBuildLegacy:
     _CONFIG_BASE = MappingProxyType(
         {
             "name": "Plugin Name",
@@ -868,3 +899,34 @@ class TestBuildStandard:
         mock.assert_called_once_with(
             "No plugin files found, please check your configuration"
         )
+
+
+class TestBuildIpc:
+    _CONFIG_BASE = MappingProxyType(
+        {
+            "compatibility": "ipc",
+            "name": "Plugin Name",
+            "description": "Short Decription",
+            "description_full": ["Full multiline\n", "description"],
+            "identifier": "com.plugin.identifier",
+            "author": {"name": "bar", "email": "bar@domain"},
+            "license": "MIT",
+            "status": "stable",
+            "kicad_version": "6.0",
+        }
+    )
+
+    def test_build_minimal_config(self, monkeypatch, isolation, dist_dir):
+        mock = Mock()
+        monkeypatch.setattr("hatchling.bridge.app.Application.abort", mock)
+
+        data = merge_dicts(
+            self._CONFIG_BASE,
+            {},
+        )
+        config = merge_dicts(
+            {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        builder.build_standard(dist_dir)
+        mock.assert_called_once_with("Unsupported compatibility mode")

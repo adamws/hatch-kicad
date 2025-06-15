@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+from enum import Enum
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -12,6 +13,14 @@ from hatchling.utils.context import Context
 from packaging.version import parse
 
 from hatch_kicad.licenses.supported import LICENSES
+
+
+class Compatibility(str, Enum):
+    LEGACY = "legacy"
+    IPC = "ipc"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 class Person(TypedDict):
@@ -30,6 +39,7 @@ class KicadBuilderConfig(BuilderConfig):
         super().__init__(*args, **kwargs)
 
         self.__context: Context | None = None
+        self.__compatibility: Compatibility | None = None
         self.__zip_name: str | None = None
         self.__name: str | None = None
         self.__description: str | None = None
@@ -52,6 +62,27 @@ class KicadBuilderConfig(BuilderConfig):
         if self.__context is None:
             self.__context = Context(self.root)
         return self.__context
+
+    @property
+    def compatibility(self) -> Compatibility:
+        def _get_compatibility() -> Compatibility:
+            name = "compatibility"
+            if name in self.target_config:
+                value = self.target_config[name]
+                try:
+                    return Compatibility(value)
+                except ValueError:
+                    allowed = ", ".join(c for c in Compatibility)
+                    msg = (
+                        f"Invalid compatibility value: `{value}`\n"
+                        f"Compatibility can be one of the following values: {allowed}"
+                    )
+                    raise ValueError(msg)
+            return Compatibility.LEGACY
+
+        if not self.__compatibility:
+            self.__compatibility = _get_compatibility()
+        return self.__compatibility
 
     @property
     def zip_name(self) -> str:
