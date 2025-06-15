@@ -28,6 +28,17 @@ class Person(TypedDict):
     contact: dict[str, str]
 
 
+class Action(TypedDict):
+    identifier: str
+    name: str
+    description: str
+    show_button: bool
+    scopes: list[str]
+    entrypoint: str
+    icons_light: list[str]
+    icons_dark: list[str]
+
+
 class KicadBuilderConfig(BuilderConfig):
     _BASE = "tool.hatch.build.targets.kicad-package"
     _CONTACT_KEY_REGEX = r"^[a-zA-Z][-a-zA-Z0-9 ]{0,48}[a-zA-Z0-9]$"
@@ -56,6 +67,7 @@ class KicadBuilderConfig(BuilderConfig):
         self.__icon: Path | None = None
         self.__version: str | None = None
         self.__download_url: str | None = None
+        self.__actions: list[Action] | None = None
 
     @property
     def context(self) -> Context:
@@ -444,6 +456,83 @@ class KicadBuilderConfig(BuilderConfig):
                 url = ""
             self.__download_url = url
         return self.__download_url
+
+    def validate_icon_list(self, icons: list, field_name: str) -> None:
+        if not (
+            isinstance(icons, list)
+            and len(icons)
+            and all(Path(item).is_file() for item in icons)
+        ):
+            msg = (
+                f"Field `{field_name}` must be not empty list of "
+                "paths to existing files"
+            )
+            raise ValueError(msg)
+
+    def validate_action(self, action: dict, field_name: str) -> None:
+        required_properties = ["identifier", "name", "description", "entrypoint"]
+        for prop in required_properties:
+            if prop not in action:
+                msg = f"Each `{field_name}` item must have `{prop}` property"
+                raise TypeError(msg)
+            if not isinstance(action[prop], str):
+                msg = f"Field `{field_name}.{prop}` must be a string"
+                raise TypeError(msg)
+        # check icons list if present
+        for icon_type in ["icons_light", "icons_dark"]:
+            if icon_type in action:
+                self.validate_icon_list(action[icon_type], f"{field_name}.{icon_type}")
+        # if `show_button` True then `icons_light` must point to at least one icon
+        if action.get("show_button"):
+            if "icons_light" not in action:
+                msg = (
+                    f"Field `{field_name}.icons_light` must be defined when "
+                    f"`{field_name}.show_button` equals true"
+                )
+                raise ValueError(msg)
+
+    @property
+    def actions(self) -> list[Action]:
+        if not self.__actions:
+            if "actions" in self.target_config:
+                actions: list[dict] = self.target_config["actions"]
+                if not (
+                    isinstance(actions, list)
+                    and len(actions)
+                    and all(isinstance(item, dict) for item in actions)
+                ):
+                    msg = f"Field `{self._BASE}.actions` must be a list of dictionaries"
+                    raise TypeError(msg)
+                actions_parsed: list[Action] = []
+                all_identifiers = set()
+                for action in actions:
+                    self.validate_action(action, f"{self._BASE}.actions")
+                    identifier = action["identifier"]
+                    if identifier in all_identifiers:
+                        msg = (
+                            f"Field `{self._BASE}.actions.identifier` must be unique "
+                            "within plugin"
+                        )
+                        raise ValueError(msg)
+
+                    all_identifiers.add(identifier)
+                    actions_parsed.append(
+                        Action(
+                            identifier=identifier,
+                            name=action["name"],
+                            description=action["description"],
+                            show_button=action.get("show_button", True),
+                            scopes=["pcb"],
+                            entrypoint=action["entrypoint"],
+                            icons_light=action.get("icons_light", []),
+                            icons_dark=action.get("icons_dark", []),
+                        )
+                    )
+            else:
+                msg = f"Field `{self._BASE}.actions` not found"
+                raise ValueError(msg)
+            self.__actions = actions_parsed
+        return self.__actions
 
     def get_metadata(self) -> dict[str, Any]:
         metadata: dict[str, Any] = {

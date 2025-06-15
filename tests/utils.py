@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import zipfile
+from typing import Any
 
 
-def merge_dicts(x, y):
+def merge_dicts(x, y) -> dict[str, Any]:
     z = x.copy()
     z.update(y)
     return z

@@ -14,6 +14,7 @@ import pytest
 from hatchling.builders.plugin.interface import BuilderInterface
 
 from hatch_kicad.build import KicadBuilder, get_package_metadata
+from hatch_kicad.config import Action
 
 from .utils import assert_zip_content, build_config, merge_dicts
 
@@ -620,6 +621,93 @@ def test_download_url_wrong_type(isolation):
 def test_download_url_missing(isolation):
     builder = KicadBuilder(str(isolation), config={})
     assert builder.config.download_url == ""
+
+
+class TestActions:
+    def create_action(self, values: dict):
+        return merge_dicts(
+            {
+                "identifier": "plugin-action",
+                "name": "Run",
+                "description": "Run plugin",
+                "entrypoint": "main.py",
+            },
+            values,
+        )
+
+    def test_actions(self, isolation):
+        tf = tempfile.NamedTemporaryFile()
+        actions = [self.create_action({"show_button": True, "icons_light": [tf.name]})]
+        config = merge_dicts(
+            {"project": {"name": "plugin", "version": "0.0.1"}},
+            build_config({"actions": actions}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        assert builder.config.actions == [
+            Action(
+                scopes=["pcb"],
+                icons_dark=[],
+                **actions[0],
+            )
+        ]
+
+    def test_actions_button_enabled_no_icon(self, isolation):
+        actions = [self.create_action({"show_button": True})]
+        config = merge_dicts(
+            {"project": {"name": "plugin", "version": "0.0.1"}},
+            build_config({"actions": actions}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        with pytest.raises(
+            ValueError,
+            match="Field `tool.hatch.build.targets.kicad-package.actions.icons_light` "
+            "must be defined when "
+            "`tool.hatch.build.targets.kicad-package.actions.show_button` "
+            "equals true",
+        ):
+            _ = builder.config.actions
+
+    @pytest.mark.parametrize("icons_type", ["icons_light", "icons_dark"])
+    @pytest.mark.parametrize("icons", [[], ["no-such-file.png"]])
+    def test_actions_button_enabled_invalid_icon(self, isolation, icons_type, icons):
+        actions = [self.create_action({icons_type: icons})]
+        config = merge_dicts(
+            {"project": {"name": "plugin", "version": "0.0.1"}},
+            build_config({"actions": actions}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        with pytest.raises(
+            ValueError,
+            match=f"Field `tool.hatch.build.targets.kicad-package.actions.{icons_type}` "
+            "must be not empty list of paths to existing files",
+        ):
+            _ = builder.config.actions
+
+    def test_actions_unique_identifier(self, isolation):
+        actions = [
+            self.create_action({"show_button": False}),
+            self.create_action({"show_button": False}),
+        ]
+        config = merge_dicts(
+            {"project": {"name": "plugin", "version": "0.0.1"}},
+            build_config({"actions": actions}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        with pytest.raises(
+            ValueError,
+            match="Field `tool.hatch.build.targets.kicad-package.actions.identifier` "
+            "must be unique within plugin",
+        ):
+            _ = builder.config.actions
+
+    def test_actions_missing(self, isolation):
+        config = {"project": {"name": "plugin", "version": "0.0.1"}}
+        builder = KicadBuilder(str(isolation), config=config)
+        with pytest.raises(
+            ValueError,
+            match="Field `tool.hatch.build.targets.kicad-package.actions` not found",
+        ):
+            _ = builder.config.actions
 
 
 @pytest.mark.parametrize(
