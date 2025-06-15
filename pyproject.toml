@@ -52,6 +52,7 @@ exclude = [
 dependencies = [
   "coverage[toml]>=6.5",
   "coveralls>=3.0.0",
+  "jsonschema",
   "pytest",
 ]
 [tool.hatch.envs.default.scripts]

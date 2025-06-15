@@ -6,12 +6,14 @@ from __future__ import annotations
 import json
 import re
 import tempfile
+import zipfile
 from pathlib import Path
 from types import MappingProxyType
 from unittest.mock import Mock
 
 import pytest
 from hatchling.builders.plugin.interface import BuilderInterface
+from jsonschema import validate
 
 from hatch_kicad.build import KicadBuilder, get_package_metadata
 from hatch_kicad.config import Action
@@ -988,33 +990,61 @@ class TestBuildLegacy:
             "No plugin files found, please check your configuration"
         )
 
-
-class TestBuildIpc:
-    _CONFIG_BASE = MappingProxyType(
-        {
-            "compatibility": "ipc",
-            "name": "Plugin Name",
-            "description": "Short Decription",
-            "description_full": ["Full multiline\n", "description"],
-            "identifier": "com.plugin.identifier",
-            "author": {"name": "bar", "email": "bar@domain"},
-            "license": "MIT",
-            "status": "stable",
-            "kicad_version": "6.0",
-        }
-    )
-
-    def test_build_minimal_config(self, monkeypatch, isolation, dist_dir):
-        mock = Mock()
-        monkeypatch.setattr("hatchling.bridge.app.Application.abort", mock)
-
+    def test_ipc_mode(self, isolation, fake_project, dist_dir):
+        icon, sources = fake_project
         data = merge_dicts(
             self._CONFIG_BASE,
-            {},
+            {
+                "compatibility": "ipc",
+                "icon": icon.name,
+                "sources": ["src"],
+                "include": ["src/*.py"],
+                "actions": [
+                    {
+                        "identifier": "test-plugin",
+                        "name": "Run",
+                        "description": "Run test-plugin entrypoint",
+                        "entrypoint": "main.py",
+                    },
+                ],
+            },
         )
         config = merge_dicts(
             {"project": {"name": "Plugin", "version": "0.0.1"}}, build_config(data)
         )
         builder = KicadBuilder(str(isolation), config=config)
         builder.build_standard(dist_dir)
-        mock.assert_called_once_with("Unsupported compatibility mode")
+        with open(f"{dist_dir}/metadata.json") as f:
+            metadata_result = json.load(f)
+            self.assert_versions(
+                metadata_result, version="0.0.1", status="stable", kicad_version="6.0"
+            )
+            # assert that produced json contains same data as internall config metadata
+            # (ignoring version which contains dynamic data sha and sizes)
+            assert self.filter_dict(metadata_result, ["versions"]) == self.filter_dict(
+                builder.config.get_metadata(), ["versions"]
+            )
+
+        expected = ["resources/icon.png", "metadata.json", "plugins/plugin.json"]
+        for s in sources:
+            name = Path(s.name).name
+            expected.append(f"plugins/{name}")
+        zip_path = f"{isolation}/dist/Plugin-0.0.1.zip"
+        assert_zip_content(zip_path, expected)
+
+        plugin_json_output_path = Path(dist_dir) / "plugin.json"
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            with (
+                zip_ref.open("plugins/plugin.json") as source,
+                open(plugin_json_output_path, "wb") as target,
+            ):
+                target.write(source.read())
+
+        test_dir = Path(__file__).parent
+        with (
+            open(f"{dist_dir}/plugin.json") as meta,
+            open(f"{test_dir}/schemas/api.v1.schema.json") as schema,
+        ):
+            plugin_metadata = json.load(meta)
+            schema_dict = json.load(schema)
+            validate(instance=plugin_metadata, schema=schema_dict)

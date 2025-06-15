@@ -564,3 +564,20 @@ class KicadBuilderConfig(BuilderConfig):
             del metadata["versions"][0]["kicad_version_max"]
 
         return metadata
+
+    def get_ipc_plugin_data(self) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "$schema": "https://go.kicad.org/api/schemas/v1",
+            "identifier": self.identifier,
+            "name": self.name,
+            "description": self.description,
+            "runtime": {
+                "type": "python",
+                "min_version": "3.9",  # not yet used by KiCad
+            },
+            "actions": [
+                {k.replace("_", "-"): v for k, v in action.items()}
+                for action in self.actions
+            ],
+        }
+        return metadata

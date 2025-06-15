@@ -45,11 +45,6 @@ class KicadBuilder(BuilderInterface):
         return {"standard": self.build_standard}
 
     def build_standard(self, directory: str, **build_data: Any) -> str:
-        if self.config.compatibility != Compatibility.LEGACY:
-            # currently only LEGACY fully supported, IPC under development
-            self.app.abort("Unsupported compatibility mode")
-            return ""
-
         zip_target = Path(directory, self.config.zip_name)
         metadata_target = Path(directory, "metadata.json")
 
@@ -75,6 +70,12 @@ class KicadBuilder(BuilderInterface):
                     zipf.write(file.path, f"plugins/{file.distribution_path}")
                 zipf.write(self.config.icon, "resources/icon.png")
                 zipf.write(metadata_target, "metadata.json")
+                if self.config.compatibility == Compatibility.IPC:
+                    ipc_metadata = self.config.get_ipc_plugin_data()
+                    plugin_json_target = Path(zip_target.parent, "plugin.json")
+                    with open(plugin_json_target, "w") as f:
+                        json.dump(ipc_metadata, f, indent=4)
+                    zipf.write(plugin_json_target, "plugins/plugin.json")
 
             if not found_plugin_files:
                 self.app.display_error(
