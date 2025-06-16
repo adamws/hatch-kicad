@@ -637,14 +637,16 @@ class TestActions:
             values,
         )
 
-    def test_actions(self, isolation):
-        tf = tempfile.NamedTemporaryFile()
-        actions = [self.create_action({"show_button": True, "icons_light": [tf.name]})]
-        config = merge_dicts(
+    def create_config(self, actions):
+        return merge_dicts(
             {"project": {"name": "plugin", "version": "0.0.1"}},
             build_config({"actions": actions}),
         )
-        builder = KicadBuilder(str(isolation), config=config)
+
+    def test_actions(self, isolation):
+        tf = tempfile.NamedTemporaryFile()
+        actions = [self.create_action({"show_button": True, "icons_light": [tf.name]})]
+        builder = KicadBuilder(str(isolation), config=self.create_config(actions))
         assert builder.config.actions == [
             Action(
                 scopes=["pcb"],
@@ -655,11 +657,7 @@ class TestActions:
 
     def test_actions_button_enabled_no_icon(self, isolation):
         actions = [self.create_action({"show_button": True})]
-        config = merge_dicts(
-            {"project": {"name": "plugin", "version": "0.0.1"}},
-            build_config({"actions": actions}),
-        )
-        builder = KicadBuilder(str(isolation), config=config)
+        builder = KicadBuilder(str(isolation), config=self.create_config(actions))
         with pytest.raises(
             ValueError,
             match="Field `tool.hatch.build.targets.kicad-package.actions.icons_light` "
@@ -673,11 +671,7 @@ class TestActions:
     @pytest.mark.parametrize("icons", [[], ["no-such-file.png"]])
     def test_actions_button_enabled_invalid_icon(self, isolation, icons_type, icons):
         actions = [self.create_action({icons_type: icons})]
-        config = merge_dicts(
-            {"project": {"name": "plugin", "version": "0.0.1"}},
-            build_config({"actions": actions}),
-        )
-        builder = KicadBuilder(str(isolation), config=config)
+        builder = KicadBuilder(str(isolation), config=self.create_config(actions))
         with pytest.raises(
             ValueError,
             match=f"Field `tool.hatch.build.targets.kicad-package.actions.{icons_type}` "
@@ -690,11 +684,7 @@ class TestActions:
             self.create_action({"show_button": False}),
             self.create_action({"show_button": False}),
         ]
-        config = merge_dicts(
-            {"project": {"name": "plugin", "version": "0.0.1"}},
-            build_config({"actions": actions}),
-        )
-        builder = KicadBuilder(str(isolation), config=config)
+        builder = KicadBuilder(str(isolation), config=self.create_config(actions))
         with pytest.raises(
             ValueError,
             match="Field `tool.hatch.build.targets.kicad-package.actions.identifier` "
@@ -708,6 +698,52 @@ class TestActions:
         with pytest.raises(
             ValueError,
             match="Field `tool.hatch.build.targets.kicad-package.actions` not found",
+        ):
+            _ = builder.config.actions
+
+    @pytest.mark.parametrize("action", [[], {}, ["not-dict", {}]])
+    def test_actions_wrong_type(self, isolation, action):
+        config = merge_dicts(
+            {"project": {"name": "plugin", "version": "0.0.1"}},
+            build_config({"actions": action}),
+        )
+        builder = KicadBuilder(str(isolation), config=config)
+        with pytest.raises(
+            TypeError,
+            match="Field `tool.hatch.build.targets.kicad-package.actions` "
+            "must be a list of dictionaries",
+        ):
+            _ = builder.config.actions
+
+    @pytest.mark.parametrize(
+        "missing_prop", ["identifier", "name", "description", "entrypoint"]
+    )
+    def test_actions_missing_prop(self, isolation, missing_prop):
+        actions = [
+            self.create_action({"show_button": False}),
+        ]
+        del actions[0][missing_prop]
+        builder = KicadBuilder(str(isolation), config=self.create_config(actions))
+        with pytest.raises(
+            TypeError,
+            match="Each `tool.hatch.build.targets.kicad-package.actions` "
+            f"item must have `{missing_prop}` property",
+        ):
+            _ = builder.config.actions
+
+    @pytest.mark.parametrize(
+        "wrong_prop", ["identifier", "name", "description", "entrypoint"]
+    )
+    def test_actions_wrong_prop_type(self, isolation, wrong_prop):
+        actions = [
+            self.create_action({"show_button": False}),
+        ]
+        actions[0][wrong_prop] = []
+        builder = KicadBuilder(str(isolation), config=self.create_config(actions))
+        with pytest.raises(
+            TypeError,
+            match=f"Field `tool.hatch.build.targets.kicad-package.actions.{wrong_prop}` "
+            "must be a string",
         ):
             _ = builder.config.actions
 
