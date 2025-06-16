@@ -831,6 +831,15 @@ class TestBuildLegacy:
         for k, v in kwargs.items():
             assert versions[0][k] == v
 
+    def assert_json_in_zip(self, zip_path: Path, arcname: str, schema_path: Path):
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            with zip_ref.open(arcname) as source:
+                plugin_metadata = json.load(source)
+
+        with open(schema_path) as schema:
+            schema_dict = json.load(schema)
+            validate(instance=plugin_metadata, schema=schema_dict)
+
     def filter_dict(self, data: dict, ignore: list[str]) -> dict:
         return {k: v for k, v in data.items() if k not in ignore}
 
@@ -872,9 +881,11 @@ class TestBuildLegacy:
         for s in sources:
             name = Path(s.name).name
             expected.append(f"plugins/{name}")
-        assert_zip_content(
-            f"{isolation}/dist/Plugin-0.0.1.zip", expected, reproducible=reproducible
-        )
+        zip_path = f"{isolation}/dist/Plugin-0.0.1.zip"
+        assert_zip_content(zip_path, expected, reproducible=reproducible)
+        test_dir = Path(__file__).parent
+        schema_path = test_dir / "schemas/pcm.v1.schema.json"
+        self.assert_json_in_zip(Path(zip_path), "metadata.json", schema_path)
 
     def test_build_failed_maintainer(
         self, monkeypatch, isolation, fake_project, dist_dir
@@ -1032,19 +1043,6 @@ class TestBuildLegacy:
         zip_path = f"{isolation}/dist/Plugin-0.0.1.zip"
         assert_zip_content(zip_path, expected)
 
-        plugin_json_output_path = Path(dist_dir) / "plugin.json"
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            with (
-                zip_ref.open("plugins/plugin.json") as source,
-                open(plugin_json_output_path, "wb") as target,
-            ):
-                target.write(source.read())
-
         test_dir = Path(__file__).parent
-        with (
-            open(f"{dist_dir}/plugin.json") as meta,
-            open(f"{test_dir}/schemas/api.v1.schema.json") as schema,
-        ):
-            plugin_metadata = json.load(meta)
-            schema_dict = json.load(schema)
-            validate(instance=plugin_metadata, schema=schema_dict)
+        schema_path = test_dir / "schemas/api.v1.schema.json"
+        self.assert_json_in_zip(Path(zip_path), "plugins/plugin.json", schema_path)
