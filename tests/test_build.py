@@ -644,7 +644,7 @@ class TestActions:
         )
 
     def test_actions(self, isolation):
-        tf = tempfile.NamedTemporaryFile()
+        tf = tempfile.NamedTemporaryFile(suffix=".png")
         actions = [self.create_action({"show_button": True, "icons_light": [tf.name]})]
         builder = KicadBuilder(str(isolation), config=self.create_config(actions))
         assert builder.config.actions == [
@@ -655,8 +655,33 @@ class TestActions:
             )
         ]
 
+    @pytest.mark.parametrize("icons_type", ["icons_light", "icons_dark"])
+    def test_actions_icon_not_png(self, isolation, icons_type):
+        tf = tempfile.NamedTemporaryFile(suffix=".jpg")
+        actions = [self.create_action({icons_type: [tf.name]})]
+        builder = KicadBuilder(str(isolation), config=self.create_config(actions))
+        with pytest.raises(
+            ValueError,
+            match=f"Field `tool.hatch.build.targets.kicad-package.actions.{icons_type}` "
+            "must contain only paths to `.png` files",
+        ):
+            _ = builder.config.actions
+
     def test_actions_button_enabled_no_icon(self, isolation):
         actions = [self.create_action({"show_button": True})]
+        builder = KicadBuilder(str(isolation), config=self.create_config(actions))
+        with pytest.raises(
+            ValueError,
+            match="Field `tool.hatch.build.targets.kicad-package.actions.icons_light` "
+            "must be defined when "
+            "`tool.hatch.build.targets.kicad-package.actions.show_button` "
+            "equals true",
+        ):
+            _ = builder.config.actions
+
+    def test_actions_button_default_no_icon(self, isolation):
+        # `show_button` defaults to True, so an omitted value must still require an icon
+        actions = [self.create_action({})]
         builder = KicadBuilder(str(isolation), config=self.create_config(actions))
         with pytest.raises(
             ValueError,
@@ -1052,6 +1077,7 @@ class TestBuildLegacy:
                         "name": "Run",
                         "description": "Run test-plugin entrypoint",
                         "entrypoint": "main.py",
+                        "show_button": False,
                     },
                 ],
             },

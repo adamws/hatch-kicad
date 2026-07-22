@@ -468,6 +468,10 @@ class KicadBuilderConfig(BuilderConfig):
                 "paths to existing files"
             )
             raise ValueError(msg)
+        # KiCad's plugin schema requires icons to be PNG files
+        if not all(str(item).endswith(".png") for item in icons):
+            msg = f"Field `{field_name}` must contain only paths to `.png` files"
+            raise ValueError(msg)
 
     def validate_action(self, action: dict, field_name: str) -> None:
         required_properties = ["identifier", "name", "description", "entrypoint"]
@@ -483,7 +487,8 @@ class KicadBuilderConfig(BuilderConfig):
             if icon_type in action:
                 self.validate_icon_list(action[icon_type], f"{field_name}.{icon_type}")
         # if `show_button` True then `icons_light` must point to at least one icon
-        if action.get("show_button"):
+        # (`show_button` defaults to True when omitted, matching `actions` below)
+        if action.get("show_button", True):
             if "icons_light" not in action:
                 msg = (
                     f"Field `{field_name}.icons_light` must be defined when "
