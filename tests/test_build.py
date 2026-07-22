@@ -835,7 +835,7 @@ def test_get_metadata(isolation):
     )
     builder = KicadBuilder(str(isolation), config=config)
     assert builder.config.get_metadata() == {
-        "$schema": "https://go.kicad.org/pcm/schemas/v1",
+        "$schema": "https://go.kicad.org/pcm/schemas/v2",
         "name": "Plugin Name",
         "description": "Short Decription",
         "description_full": "Full multiline\ndescription",
@@ -945,7 +945,7 @@ class TestBuildLegacy:
         zip_path = f"{isolation}/dist/Plugin-0.0.1.zip"
         assert_zip_content(zip_path, expected, reproducible=reproducible)
         test_dir = Path(__file__).parent
-        schema_path = test_dir / "schemas/pcm.v1.schema.json"
+        schema_path = test_dir / "schemas/pcm.v2.schema.json"
         self.assert_json_in_zip(Path(zip_path), "metadata.json", schema_path)
 
     def test_build_failed_maintainer(
@@ -1092,6 +1092,8 @@ class TestBuildLegacy:
             self.assert_versions(
                 metadata_result, version="0.0.1", status="stable", kicad_version="6.0"
             )
+            # `ipc` packages must declare the `ipc` runtime in the version entry
+            assert metadata_result["versions"][0]["runtime"] == "ipc"
             # assert that produced json contains same data as internall config metadata
             # (ignoring version which contains dynamic data sha and sizes)
             assert self.filter_dict(metadata_result, ["versions"]) == self.filter_dict(
@@ -1106,5 +1108,11 @@ class TestBuildLegacy:
         assert_zip_content(zip_path, expected)
 
         test_dir = Path(__file__).parent
-        schema_path = test_dir / "schemas/api.v1.schema.json"
-        self.assert_json_in_zip(Path(zip_path), "plugins/plugin.json", schema_path)
+        self.assert_json_in_zip(
+            Path(zip_path), "metadata.json", test_dir / "schemas/pcm.v2.schema.json"
+        )
+        self.assert_json_in_zip(
+            Path(zip_path),
+            "plugins/plugin.json",
+            test_dir / "schemas/api.v1.schema.json",
+        )

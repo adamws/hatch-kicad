@@ -138,7 +138,7 @@ def test_finalize(isolation, dist_dir, fake_project, fake_artifacts):
         repository = json.load(f)
         assert repository["$schema"] == (
             "https://gitlab.com/kicad/code/kicad/"
-            "-/raw/master/kicad/pcm/schemas/pcm.v1.schema.json#/definitions/Repository"
+            "-/raw/master/kicad/pcm/schemas/pcm.v2.schema.json#/definitions/Repository"
         )
         assert repository["maintainer"] == {
             "name": "bar",

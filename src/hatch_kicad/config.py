@@ -540,8 +540,18 @@ class KicadBuilderConfig(BuilderConfig):
         return self.__actions
 
     def get_metadata(self) -> dict[str, Any]:
+        version: dict[str, Any] = {
+            "version": self.version,
+            "status": self.status,
+            "kicad_version": self.kicad_version,
+            "kicad_version_max": self.kicad_version_max,
+        }
+        # `runtime` is a PCM schema v2 addition; it is assumed to be `swig` when
+        # absent, so it is only emitted for `ipc` packages
+        if self.compatibility == Compatibility.IPC:
+            version["runtime"] = "ipc"
         metadata: dict[str, Any] = {
-            "$schema": "https://go.kicad.org/pcm/schemas/v1",
+            "$schema": "https://go.kicad.org/pcm/schemas/v2",
             "name": self.name,
             "description": self.description,
             "description_full": self.description_full,
@@ -552,14 +562,7 @@ class KicadBuilderConfig(BuilderConfig):
             "license": self.license,
             "resources": self.resources,
             "tags": self.tags,
-            "versions": [
-                {
-                    "version": self.version,
-                    "status": self.status,
-                    "kicad_version": self.kicad_version,
-                    "kicad_version_max": self.kicad_version_max,
-                }
-            ],
+            "versions": [version],
         }
         # remove empty optional fields
         for name in ["maintainer", "tags"]:

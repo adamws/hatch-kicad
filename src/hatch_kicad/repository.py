@@ -173,7 +173,7 @@ class KicadRepositoryHook(BuildHookInterface):
 
     def create_repository_file(self) -> None:
         repository = {
-            "$schema": "https://gitlab.com/kicad/code/kicad/-/raw/master/kicad/pcm/schemas/pcm.v1.schema.json#/definitions/Repository",
+            "$schema": "https://gitlab.com/kicad/code/kicad/-/raw/master/kicad/pcm/schemas/pcm.v2.schema.json#/definitions/Repository",
             "maintainer": self.build_config.author,
             "name": f"{self.repository_url} repository",
             "packages": get_file_metadata(self.packages_out, self.repository_url),
