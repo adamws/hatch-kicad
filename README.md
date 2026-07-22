@@ -94,7 +94,46 @@ Archive root
 > `metadata.json` is created and packaged by plugin. Do not create it manually.
 
 For `ipc` packages, the archive structure is more flexible and rewriting
-paths is not required. Just ensure that `entrypoint` value uses correct path.
+paths is not required. Just ensure that `entrypoint` and action icon values
+use correct paths. Because paths are not rewritten, they are the same at
+build time and inside the archive (both relative to the project root):
+
+```toml
+[tool.hatch.build.kicad-package]
+compatibility = "ipc"
+include = [
+  "src/*.py",
+  "src/icon.png",
+]
+# icon (regardless of the filename) will be copied to
+# resources/icon.png inside the zip package
+icon = "resources/icon.png"
+name = "Plugin name"
+actions = [
+  { identifier = "run", name = "Run", description = "Run plugin",
+    entrypoint = "src/main.py", icons_light = ["src/icon.png"] },
+]
+# ...remaining required options
+```
+
+The resulting `ipc` archive looks like this:
+
+```shell
+Archive root
+├── plugins
+│   ├── plugin.json
+│   ├── src
+│   │   ├── main.py
+│   │   ├── icon.png
+│   │   ├── ...
+├── resources
+│   ├── icon.png
+├── metadata.json
+```
+
+> [!IMPORTANT]
+> `plugin.json` is generated from the `actions` option and packaged by plugin.
+> Do not create it manually.
 
 <!-- TOC --><a name="options-details"></a>
 ### Option details
@@ -144,6 +183,9 @@ as described below:
 | `entrypoint`        | `str`                                                                                      | **required**                                                                                                                                                                                                                                                                                                         | The way KiCad should launch this action (for example, the name of a Python script)                                                                                                                                                                                                                                                             |
 | `icons_light`       | `list` of `str`                                                                            | `[]`, **required** when `show_button` enabled                                                                                                                                                                                                                                                                        | A list of one or more paths to PNG files to be shown in light mode.                                                                                                                                                                                                                                                                            |
 | `icons_dark`        | `list` of `str`                                                                            | `[]`                                                                                                                                                                                                                                                                                                                 | A list of one or more paths to PNG files to be shown in dark mode.                                                                                                                                                                                                                                                                             |
+
+> [!NOTE]
+> Action `scopes` are currently fixed to the PCB editor (`pcb`) and cannot be configured.
 
 <!-- TOC --><a name="environment-variables-substitution"></a>
 #### Environment variables substitution
