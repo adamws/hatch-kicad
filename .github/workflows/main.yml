@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
 
     steps:
     - uses: actions/checkout@v7
@@ -29,11 +29,11 @@ jobs:
       run: |
         hatch run cov
     - name: Generate lcov coverage report
-      if: matrix.python-version == '3.14' && github.ref == 'refs/heads/master'
+      if: matrix.python-version == '3.15' && github.ref == 'refs/heads/master'
       run: |
         hatch run coverage lcov -o coverage.lcov
     - name: Upload coverage data
-      if: matrix.python-version == '3.14' && github.ref == 'refs/heads/master'
+      if: matrix.python-version == '3.15' && github.ref == 'refs/heads/master'
       uses: coverallsapp/github-action@v2
       with:
         file: coverage.lcov
